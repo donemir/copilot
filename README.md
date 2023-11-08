@@ -1,5 +1,6 @@
 <<<<<<< HEAD
+(your changes)
+=======
+(changes from the commit you're rebasing)
 
-# larevel-inertia-react
-
-# this is a base repo to start the project with the dashboard setup ready
+> > > > > > > updated README.md
