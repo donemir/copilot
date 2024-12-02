@@ -1,4 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+
+import { Inertia } from "@inertiajs/inertia";
+import { usePage, router } from "@inertiajs/react";
+
 import { Button } from "primereact/button";
 import { InputText } from "primereact/inputtext";
 import { InputTextarea } from "primereact/inputtextarea";
@@ -8,12 +12,33 @@ import { Dialog } from "primereact/dialog";
 import { ConfirmDialog, confirmDialog } from "primereact/confirmdialog";
 
 const Dashboard = () => {
-    // State for categories and bookmarks
-    const [categories, setCategories] = useState([
-        { id: 1, name: "Category 1", bookmarks: [] },
-        { id: 2, name: "Category 2", bookmarks: [] },
-        { id: 3, name: "Category 3", bookmarks: [] },
-    ]);
+    const { categories: initialCategories } = usePage().props;
+    const [categories, setCategories] = useState(initialCategories || []);
+
+    const [pinnedBookmarks, setPinnedBookmarks] = useState(
+        initialCategories
+            ? initialCategories.flatMap((category) =>
+                  category.bookmarks.filter((bookmark) => bookmark.pinned)
+              )
+            : []
+    );
+
+    // Helper function to get favicon URL
+    const getFaviconUrl = (url) => {
+        try {
+            const hasProtocol =
+                url.startsWith("http://") || url.startsWith("https://");
+            const fullUrl = hasProtocol ? url : `http://${url}`;
+
+            const domain = new URL(fullUrl).hostname;
+            return `https://www.google.com/s2/favicons?domain=${domain}`;
+        } catch (error) {
+            console.error("Invalid URL");
+            return "";
+        }
+    };
+
+    // Pre-defined categories and bookmarks
 
     // State for the add bookmark dialog
     const [addDialogVisible, setAddDialogVisible] = useState(false);
@@ -21,6 +46,7 @@ const Dashboard = () => {
     const [bookmarkData, setBookmarkData] = useState({
         url: "",
         description: "",
+        faviconUrl: "",
     });
 
     // State for the edit bookmark dialog
@@ -30,9 +56,22 @@ const Dashboard = () => {
     // Function to open the add bookmark dialog
     const openAddDialog = (categoryId) => {
         setCurrentCategoryId(categoryId);
-        setBookmarkData({ url: "", description: "" });
+        setBookmarkData({ url: "", description: "", faviconUrl: "" });
         setAddDialogVisible(true);
     };
+
+    // Add this useEffect to synchronize categories
+    useEffect(() => {
+        setCategories(initialCategories || []);
+    }, [initialCategories]);
+
+    useEffect(() => {
+        setPinnedBookmarks(
+            categories.flatMap((category) =>
+                category.bookmarks.filter((bookmark) => bookmark.pinned)
+            )
+        );
+    }, [categories]);
 
     // Function to add a new bookmark
     const addBookmark = () => {
@@ -41,27 +80,34 @@ const Dashboard = () => {
             return;
         }
 
-        setCategories((prevCategories) =>
-            prevCategories.map((category) =>
-                category.id === currentCategoryId
-                    ? {
-                          ...category,
-                          bookmarks: [
-                              ...category.bookmarks,
-                              {
-                                  id: Date.now(), // Unique ID
-                                  url: bookmarkData.url,
-                                  description: bookmarkData.description,
-                              },
-                          ],
-                      }
-                    : category
-            )
-        );
+        const faviconUrl = getFaviconUrl(bookmarkData.url);
 
-        setAddDialogVisible(false);
-        setBookmarkData({ url: "", description: "" });
-        setCurrentCategoryId(null);
+        // Use router.post instead of Inertia.post
+        router.post(
+            "/bookmarks",
+            {
+                category_id: currentCategoryId,
+                url: bookmarkData.url,
+                description: bookmarkData.description,
+                favicon_url: faviconUrl,
+            },
+            {
+                onSuccess: () => {
+                    // Optionally, reload categories from the server
+                    router.reload({ only: ["categories"] });
+                    setAddDialogVisible(false);
+                    setBookmarkData({
+                        url: "",
+                        description: "",
+                        faviconUrl: "",
+                    });
+                    setCurrentCategoryId(null);
+                },
+                onError: (errors) => {
+                    console.error(errors);
+                },
+            }
+        );
     };
 
     // Function to open the edit bookmark dialog
@@ -71,6 +117,7 @@ const Dashboard = () => {
         setBookmarkData({
             url: bookmark.url,
             description: bookmark.description,
+            faviconUrl: bookmark.faviconUrl,
         });
         setEditDialogVisible(true);
     };
@@ -82,30 +129,57 @@ const Dashboard = () => {
             return;
         }
 
-        setCategories((prevCategories) =>
-            prevCategories.map((category) => {
-                if (category.id === currentCategoryId) {
-                    return {
-                        ...category,
-                        bookmarks: category.bookmarks.map((bookmark) =>
-                            bookmark.id === currentBookmark.id
-                                ? {
-                                      ...bookmark,
-                                      url: bookmarkData.url,
-                                      description: bookmarkData.description,
-                                  }
-                                : bookmark
-                        ),
-                    };
-                }
-                return category;
-            })
-        );
+        const faviconUrl = getFaviconUrl(bookmarkData.url);
 
-        setEditDialogVisible(false);
-        setBookmarkData({ url: "", description: "" });
-        setCurrentBookmark(null);
-        setCurrentCategoryId(null);
+        router.put(
+            `/bookmarks/${currentBookmark.id}`,
+            {
+                url: bookmarkData.url,
+                description: bookmarkData.description,
+                favicon_url: faviconUrl,
+                pinned: currentBookmark.pinned,
+            },
+            {
+                onSuccess: () => {
+                    console.log("Bookmark updated successfully");
+
+                    // Close the modal
+                    setEditDialogVisible(false);
+
+                    // Reset bookmark data
+                    setBookmarkData({
+                        url: "",
+                        description: "",
+                        faviconUrl: "",
+                    });
+                    setCurrentBookmark(null);
+                    setCurrentCategoryId(null);
+
+                    // Optionally, trigger a success toast
+                    if (toast.current) {
+                        toast.current.show({
+                            severity: "success",
+                            summary: "Success",
+                            detail: "Bookmark updated successfully.",
+                            life: 3000,
+                        });
+                    }
+                },
+                onError: (errors) => {
+                    console.error("Error updating bookmark:", errors);
+
+                    // Optionally, trigger an error toast
+                    if (toast.current) {
+                        toast.current.show({
+                            severity: "error",
+                            summary: "Error",
+                            detail: "Failed to update bookmark.",
+                            life: 3000,
+                        });
+                    }
+                },
+            }
+        );
     };
 
     // Function to delete a bookmark
@@ -117,21 +191,85 @@ const Dashboard = () => {
             acceptLabel: "Yes",
             rejectLabel: "No",
             accept: () => {
-                setCategories((prevCategories) =>
-                    prevCategories.map((category) => {
-                        if (category.id === categoryId) {
-                            return {
-                                ...category,
-                                bookmarks: category.bookmarks.filter(
-                                    (bookmark) => bookmark.id !== bookmarkId
-                                ),
-                            };
-                        }
-                        return category;
-                    })
-                );
+                router.delete(`/bookmarks/${bookmarkId}`, {
+                    onSuccess: () => {
+                        // Remove the bookmark from local state
+                        setCategories((prevCategories) =>
+                            prevCategories.map((category) => {
+                                if (category.id === categoryId) {
+                                    return {
+                                        ...category,
+                                        bookmarks: category.bookmarks.filter(
+                                            (bookmark) =>
+                                                bookmark.id !== bookmarkId
+                                        ),
+                                    };
+                                } else {
+                                    return category;
+                                }
+                            })
+                        );
+                        // Also remove from pinned bookmarks if necessary
+                        setPinnedBookmarks((prevPinned) =>
+                            prevPinned.filter(
+                                (bookmark) => bookmark.id !== bookmarkId
+                            )
+                        );
+                    },
+                    onError: (errors) => {
+                        console.error(errors);
+                    },
+                });
             },
         });
+    };
+
+    // Function to toggle pinning a bookmark
+    const togglePinBookmark = (bookmark, categoryId) => {
+        const newPinnedStatus = !bookmark.pinned;
+
+        router.put(
+            `/bookmarks/${bookmark.id}`,
+            {
+                pinned: newPinnedStatus,
+            },
+            {
+                onSuccess: () => {
+                    // Update the bookmark's pinned status in local state
+                    setCategories((prevCategories) =>
+                        prevCategories.map((category) => {
+                            if (category.id === categoryId) {
+                                return {
+                                    ...category,
+                                    bookmarks: category.bookmarks.map((b) =>
+                                        b.id === bookmark.id
+                                            ? { ...b, pinned: newPinnedStatus }
+                                            : b
+                                    ),
+                                };
+                            } else {
+                                return category;
+                            }
+                        })
+                    );
+
+                    // Update pinnedBookmarks array
+                    if (newPinnedStatus) {
+                        setPinnedBookmarks((prevPinned) => [
+                            ...prevPinned,
+                            { ...bookmark, pinned: true },
+                        ]);
+                    } else {
+                        setPinnedBookmarks((prevPinned) =>
+                            prevPinned.filter((b) => b.id !== bookmark.id)
+                        );
+                    }
+                },
+                onError: (errors) => {
+                    console.error(errors);
+                },
+            }
+        );
     };
 
     // Handler for drag end
@@ -140,21 +278,24 @@ const Dashboard = () => {
 
         const { source, destination } = result;
 
-        // If the item is dropped in the same place, do nothing
+        // Handle drag and drop within pinned bookmarks (if applicable)
         if (
-            source.droppableId === destination.droppableId &&
-            source.index === destination.index
+            source.droppableId === "pinned" &&
+            destination.droppableId === "pinned"
         ) {
+            // ... existing code for pinned bookmarks
             return;
         }
 
-        // Get source and destination categories
+        // Handle drag and drop within categories
         const sourceCategory = categories.find(
             (category) => category.id.toString() === source.droppableId
         );
         const destCategory = categories.find(
             (category) => category.id.toString() === destination.droppableId
         );
+
+        if (!sourceCategory || !destCategory) return;
 
         // Get the item being moved
         const movingItem = sourceCategory.bookmarks[source.index];
@@ -179,6 +320,24 @@ const Dashboard = () => {
                 }
             })
         );
+
+        // Update the bookmark's category_id in the backend
+        router.put(
+            `/bookmarks/${movingItem.id}`,
+            {
+                category_id: destCategory.id,
+            },
+            {
+                onSuccess: () => {
+                    console.log("Bookmark category updated successfully");
+                    // Since we've updated the local state optimistically, no further action is needed
+                },
+                onError: (errors) => {
+                    console.error("Error updating bookmark category:", errors);
+                    // Optionally, revert state changes if needed
+                },
+            }
+        );
     };
 
     return (
@@ -186,6 +345,125 @@ const Dashboard = () => {
             <div className="grid">
                 {/* Confirm Dialog (for deletion confirmation) */}
                 <ConfirmDialog />
+
+                {/* Pinned Bookmarks Section */}
+                {pinnedBookmarks.length > 0 && (
+                    <div className="col-12">
+                        <div className="card">
+                            <h5>Pinned Bookmarks</h5>
+                            <DragDropContext onDragEnd={onDragEnd}>
+                                <Droppable
+                                    droppableId="pinned"
+                                    direction="horizontal"
+                                >
+                                    {(provided) => (
+                                        <div
+                                            className="flex flex-wrap" // Added 'flex-wrap' here
+                                            ref={provided.innerRef}
+                                            {...provided.droppableProps}
+                                        >
+                                            {pinnedBookmarks.map(
+                                                (bookmark, index) => (
+                                                    <Draggable
+                                                        key={bookmark.id}
+                                                        draggableId={bookmark.id.toString()}
+                                                        index={index}
+                                                    >
+                                                        {(
+                                                            provided,
+                                                            snapshot
+                                                        ) => (
+                                                            <div
+                                                                className={`p-2 m-1 border-round flex-none w-48 ${
+                                                                    snapshot.isDragging
+                                                                        ? "surface-200"
+                                                                        : "surface-100"
+                                                                }`}
+                                                                ref={
+                                                                    provided.innerRef
+                                                                }
+                                                                {...provided.draggableProps}
+                                                                {...provided.dragHandleProps}
+                                                            >
+                                                                <div className="flex align-items-center">
+                                                                    {bookmark.favicon_url && (
+                                                                        <img
+                                                                            src={
+                                                                                bookmark.favicon_url
+                                                                            }
+                                                                            alt="favicon"
+                                                                            onError={(
+                                                                                e
+                                                                            ) => {
+                                                                                e.target.onerror =
+                                                                                    null;
+                                                                                e.target.style.display =
+                                                                                    "none";
+                                                                            }}
+                                                                            style={{
+                                                                                width: "16px",
+                                                                                height: "16px",
+                                                                                marginRight:
+                                                                                    "8px",
+                                                                            }}
+                                                                        />
+                                                                    )}
+                                                                    <a
+                                                                        href={
+                                                                            bookmark.url.startsWith(
+                                                                                "http://"
+                                                                            ) ||
+                                                                            bookmark.url.startsWith(
+                                                                                "https://"
+                                                                            )
+                                                                                ? bookmark.url
+                                                                                : `http://${bookmark.url}`
+                                                                        }
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
+                                                                        className="text-primary hover:underline"
+                                                                    >
+                                                                        {bookmark.description ||
+                                                                            bookmark.url}
+                                                                    </a>
+                                                                    <Button
+                                                                        icon="pi pi-times"
+                                                                        className="p-button-text p-button-sm p-button-rounded p-button-danger ml-2"
+                                                                        onClick={() =>
+                                                                            togglePinBookmark(
+                                                                                bookmark,
+                                                                                // Find the category ID
+                                                                                categories.find(
+                                                                                    (
+                                                                                        category
+                                                                                    ) =>
+                                                                                        category.bookmarks.some(
+                                                                                            (
+                                                                                                b
+                                                                                            ) =>
+                                                                                                b.id ===
+                                                                                                bookmark.id
+                                                                                        )
+                                                                                )
+                                                                                    ?.id
+                                                                            )
+                                                                        }
+                                                                        tooltip="Unpin Bookmark"
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </Draggable>
+                                                )
+                                            )}
+                                            {provided.placeholder}
+                                        </div>
+                                    )}
+                                </Droppable>
+                            </DragDropContext>
+                        </div>
+                    </div>
+                )}
 
                 {/* Display Categories and Bookmarks with Drag and Drop */}
                 <DragDropContext onDragEnd={onDragEnd}>
@@ -238,26 +516,78 @@ const Dashboard = () => {
                                                                 {...provided.dragHandleProps}
                                                             >
                                                                 <div className="flex justify-content-between align-items-start">
-                                                                    <div>
-                                                                        <a
-                                                                            href={
-                                                                                bookmark.url
-                                                                            }
-                                                                            target="_blank"
-                                                                            rel="noopener noreferrer"
-                                                                            className="text-primary hover:underline"
-                                                                        >
-                                                                            {
-                                                                                bookmark.url
-                                                                            }
-                                                                        </a>
-                                                                        <p className="mt-1 mb-0">
-                                                                            {
-                                                                                bookmark.description
-                                                                            }
-                                                                        </p>
+                                                                    <div className="flex">
+                                                                        {bookmark.favicon_url && (
+                                                                            <img
+                                                                                src={
+                                                                                    bookmark.favicon_url
+                                                                                }
+                                                                                alt="favicon"
+                                                                                onError={(
+                                                                                    e
+                                                                                ) => {
+                                                                                    e.target.onerror =
+                                                                                        null;
+                                                                                    e.target.style.display =
+                                                                                        "none";
+                                                                                }}
+                                                                                style={{
+                                                                                    width: "16px",
+                                                                                    height: "16px",
+                                                                                    marginRight:
+                                                                                        "8px",
+                                                                                }}
+                                                                            />
+                                                                        )}
+                                                                        <div>
+                                                                            <a
+                                                                                href={
+                                                                                    bookmark.url.startsWith(
+                                                                                        "http://"
+                                                                                    ) ||
+                                                                                    bookmark.url.startsWith(
+                                                                                        "https://"
+                                                                                    )
+                                                                                        ? bookmark.url
+                                                                                        : `http://${bookmark.url}`
+                                                                                }
+                                                                                target="_blank"
+                                                                                rel="noopener noreferrer"
+                                                                                className="text-primary hover:underline"
+                                                                            >
+                                                                                {bookmark.description ||
+                                                                                    bookmark.url}
+                                                                            </a>
+                                                                        </div>
                                                                     </div>
                                                                     <div className="flex">
+                                                                        <Button
+                                                                            icon={
+                                                                                bookmark.pinned
+                                                                                    ? "pi pi-bookmark-fill"
+                                                                                    : "pi pi-bookmark"
+                                                                            }
+                                                                            className={`p-button-text p-button-sm p-button-rounded ${
+                                                                                bookmark.pinned
+                                                                                    ? "text-warning"
+                                                                                    : ""
+                                                                            }`}
+                                                                            onClick={() =>
+                                                                                togglePinBookmark(
+                                                                                    bookmark,
+                                                                                    category.id
+                                                                                )
+                                                                            }
+                                                                            tooltip={
+                                                                                bookmark.pinned
+                                                                                    ? "Unpin Bookmark"
+                                                                                    : "Pin Bookmark"
+                                                                            }
+                                                                            tooltipOptions={{
+                                                                                position:
+                                                                                    "top",
+                                                                            }}
+                                                                        />
                                                                         <Button
                                                                             icon="pi pi-pencil"
                                                                             className="p-button-text p-button-sm p-button-rounded"
@@ -312,7 +642,11 @@ const Dashboard = () => {
                     modal
                     onHide={() => {
                         setAddDialogVisible(false);
-                        setBookmarkData({ url: "", description: "" });
+                        setBookmarkData({
+                            url: "",
+                            description: "",
+                            faviconUrl: "",
+                        });
                         setCurrentCategoryId(null);
                     }}
                 >
@@ -358,7 +692,11 @@ const Dashboard = () => {
                     modal
                     onHide={() => {
                         setEditDialogVisible(false);
-                        setBookmarkData({ url: "", description: "" });
+                        setBookmarkData({
+                            url: "",
+                            description: "",
+                            faviconUrl: "",
+                        });
                         setCurrentBookmark(null);
                         setCurrentCategoryId(null);
                     }}

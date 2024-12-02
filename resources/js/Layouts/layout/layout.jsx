@@ -5,6 +5,7 @@ import {
     useUnmountEffect,
 } from "primereact/hooks";
 import React, { useContext, useEffect, useRef } from "react";
+import { usePage } from "@inertiajs/react";
 import { classNames } from "primereact/utils";
 import AppFooter from "@/Layouts/layout/AppFooter.jsx";
 import AppSidebar from "@/Layouts/layout/AppSidebar.jsx";
@@ -12,10 +13,15 @@ import AppTopbar from "@/Layouts/layout/AppTopbar.jsx";
 import AppConfig from "@/Layouts/layout/AppConfig.jsx";
 import { LayoutContext } from "./context/layoutcontext";
 import { PrimeReactContext } from "primereact/api";
+import { Toast } from "primereact/toast";
 // import { usePathname, useSearchParams } from "next/navigation";
 
 const Layout = ({ children }) => {
-    const { layoutConfig, layoutState, setLayoutState } = useContext(LayoutContext);
+    const { flash = {} } = usePage().props;
+    const toast = useRef(null);
+
+    const { layoutConfig, layoutState, setLayoutState } =
+        useContext(LayoutContext);
     const { setRipple } = useContext(PrimeReactContext);
     const topbarRef = useRef(null);
     const sidebarRef = useRef(null);
@@ -96,7 +102,9 @@ const Layout = ({ children }) => {
         } else {
             document.body.className = document.body.className.replace(
                 new RegExp(
-                    "(^|\\b)" + "blocked-scroll".split(" ").join("|") + "(\\b|$)",
+                    "(^|\\b)" +
+                        "blocked-scroll".split(" ").join("|") +
+                        "(\\b|$)",
                     "gi"
                 ),
                 " "
@@ -109,7 +117,10 @@ const Layout = ({ children }) => {
     });
 
     useEffect(() => {
-        if (layoutState.overlayMenuActive || layoutState.staticMenuMobileActive) {
+        if (
+            layoutState.overlayMenuActive ||
+            layoutState.staticMenuMobileActive
+        ) {
             bindMenuOutsideClickListener();
         }
 
@@ -121,6 +132,25 @@ const Layout = ({ children }) => {
             bindProfileMenuOutsideClickListener();
         }
     }, [layoutState.profileSidebarVisible]);
+
+    useEffect(() => {
+        if (flash.success && toast.current) {
+            toast.current.show({
+                severity: "success",
+                summary: "Success",
+                detail: flash.success,
+                life: 3000,
+            });
+        }
+        if (flash.error && toast.current) {
+            toast.current.show({
+                severity: "error",
+                summary: "Error",
+                detail: flash.error,
+                life: 3000,
+            });
+        }
+    }, [flash]);
 
     useUnmountEffect(() => {
         unbindMenuOutsideClickListener();
@@ -141,6 +171,7 @@ const Layout = ({ children }) => {
 
     return (
         <React.Fragment>
+            <Toast ref={toast} />
             <div className={containerClass}>
                 <AppTopbar ref={topbarRef} />
                 <div ref={sidebarRef} className="layout-sidebar">

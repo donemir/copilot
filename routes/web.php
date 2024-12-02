@@ -2,6 +2,10 @@
 
 use App\Http\Controllers\ProfileController;
 use Illuminate\Foundation\Application;
+
+use App\Http\Controllers\CategoriesController;
+use App\Http\Controllers\BookmarksController;
+
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -40,12 +44,24 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
+    // Categories
+    Route::post('/categories', [CategoriesController::class, 'store'])->name('categories.store');
+    Route::get('/test', [CategoriesController::class, 'index'])->name('test');
+    // Add update and delete routes for categories if needed
+
+    // Bookmarks
+    Route::post('/bookmarks', [BookmarksController::class, 'store'])->name('bookmarks.store');
+    Route::put('/bookmarks/{bookmark}', [BookmarksController::class, 'update'])->name('bookmarks.update');
+    Route::delete('/bookmarks/{bookmark}', [BookmarksController::class, 'destroy'])->name('bookmarks.destroy');
 });
 
 
 Route::get('/uikit/button', function () {
     return Inertia::render('main/uikit/button/page');
 })->name('button');
+
+
 
 
 
