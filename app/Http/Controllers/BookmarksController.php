@@ -57,7 +57,7 @@ class BookmarksController extends Controller
         $categories = auth()->user()->categories()->with('bookmarks')->get();
     
         // Return an Inertia response with the correct component name
-        return redirect()->route('test')->with('success', 'Bookmark updated successfully.')->setStatusCode(303);
+        return redirect()->route('organizer')->with('success', 'Bookmark updated successfully.')->setStatusCode(303);
 
     }
    

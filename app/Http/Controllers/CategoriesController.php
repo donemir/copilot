@@ -15,13 +15,28 @@ class CategoriesController extends Controller
             ->with('bookmarks')
             ->get();
     
-        // Log the categories to the Laravel log
-        Log::info('Categories:', $categories->toArray());
+        // If the user has no categories, provide default ones
+        if ($categories->isEmpty()) {
+            $defaultCategories = [
+                ['name' => 'Web Management', 'bookmarks' => []],
+                ['name' => 'Productivity', 'bookmarks' => []],
+                ['name' => 'Web Design Memberships', 'bookmarks' => []],
+                ['name' => 'Google Properties', 'bookmarks' => []],
+                ['name' => 'Financial / Business', 'bookmarks' => []],
+                ['name' => 'Education & Learning', 'bookmarks' => []],
+                // ... other default categories
+            ];
     
-        return Inertia::render('Dashboard/Test', [
+            foreach ($defaultCategories as $categoryData) {
+                $categories->push((object) $categoryData);
+            }
+        }
+    
+        return Inertia::render('Dashboard/Organizer', [
             'categories' => $categories,
         ]);
     }
+    
     
 
     public function store(Request $request)

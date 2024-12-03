@@ -35,9 +35,12 @@ Route::get('/dashboard', function () {
     ->name('dashboard');
 //    ->middleware(['auth', 'verified'])->name('dashboard');
 
-Route::get('/test', function () {
-    return Inertia::render('Dashboard/Test');
-})->name('test');
+// Route::get('/test', function () {
+//     return Inertia::render('Dashboard/Test');
+// })->name('test');
+Route::get('/organizer', function () {
+    return Inertia::render('Dashboard/Organizer');
+})->name('organizer');
 //   ->middleware(['auth', 'verified']); // Apply the middleware if needed
 
 Route::middleware('auth')->group(function () {
@@ -47,7 +50,8 @@ Route::middleware('auth')->group(function () {
 
     // Categories
     Route::post('/categories', [CategoriesController::class, 'store'])->name('categories.store');
-    Route::get('/test', [CategoriesController::class, 'index'])->name('test');
+    // Route::get('/test', [CategoriesController::class, 'index'])->name('test');
+    Route::get('/organizer', [CategoriesController::class, 'index'])->name('organizer');
     // Add update and delete routes for categories if needed
 
     // Bookmarks
