@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useRef, useState, useEffect } from "react";
 
 import { Inertia } from "@inertiajs/inertia";
 import { usePage, router } from "@inertiajs/react";
@@ -10,8 +10,11 @@ import Layout from "@/Layouts/layout/layout.jsx";
 import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
 import { Dialog } from "primereact/dialog";
 import { ConfirmDialog, confirmDialog } from "primereact/confirmdialog";
+import { Toast } from "primereact/toast";
 
 const Dashboard = () => {
+    const toast = useRef(null);
+
     const { categories: initialCategories } = usePage().props;
     const [categories, setCategories] = useState(initialCategories || []);
 
@@ -75,8 +78,34 @@ const Dashboard = () => {
 
     // Function to add a new bookmark
     const addBookmark = () => {
-        if (!bookmarkData.url) {
-            alert("Please enter a URL.");
+        if (
+            !bookmarkData.url.startsWith("http://") &&
+            !bookmarkData.url.startsWith("https://")
+        ) {
+            bookmarkData.url = "https://" + bookmarkData.url; // Use bookmarkData.url instead of url
+        }
+
+        // Validate the URL format
+        try {
+            const urlObject = new URL(bookmarkData.url);
+            if (!urlObject.hostname.includes(".")) {
+                console.log("Invalid URL format 1");
+                toast.current.show({
+                    severity: "error",
+                    summary: "Error",
+                    detail: "Please enter a valid URL.",
+                    life: 3000,
+                });
+                return;
+            }
+        } catch (error) {
+            console.log("Invalid URL format 2");
+            toast.current.show({
+                severity: "error",
+                summary: "Error",
+                detail: "Please enter a valid URL.",
+                life: 3000,
+            });
             return;
         }
 
@@ -104,7 +133,16 @@ const Dashboard = () => {
                     setCurrentCategoryId(null);
                 },
                 onError: (errors) => {
-                    console.error(errors);
+                    console.error("Error updating bookmark:", errors);
+                    // Optionally, trigger an error toast
+                    if (toast.current) {
+                        toast.current.show({
+                            severity: "error",
+                            summary: "Error",
+                            detail: "Failed to update bookmark.",
+                            life: 3000,
+                        });
+                    }
                 },
             }
         );
@@ -124,8 +162,35 @@ const Dashboard = () => {
 
     // Function to save changes to an existing bookmark
     const saveBookmarkChanges = () => {
-        if (!bookmarkData.url) {
-            alert("Please enter a URL.");
+        // Prepend 'https://' if missing
+        if (
+            !bookmarkData.url.startsWith("http://") &&
+            !bookmarkData.url.startsWith("https://")
+        ) {
+            bookmarkData.url = "https://" + url;
+        }
+
+        // Validate the URL format
+        try {
+            const urlObject = new URL(url);
+            if (!urlObject.hostname.includes(".")) {
+                console.log("Invalid URL format 1");
+                toast.current.show({
+                    severity: "error",
+                    summary: "Error",
+                    detail: "Please enter a valid URL.",
+                    life: 3000,
+                });
+                return;
+            }
+        } catch (error) {
+            console.log("Invalid URL format 2");
+            toast.current.show({
+                severity: "error",
+                summary: "Error",
+                detail: "Please enter a valid URL.",
+                life: 3000,
+            });
             return;
         }
 
@@ -342,6 +407,7 @@ const Dashboard = () => {
 
     return (
         <Layout>
+            <Toast ref={toast} />
             <div className="grid">
                 {/* Confirm Dialog (for deletion confirmation) */}
                 <ConfirmDialog />
