@@ -11,31 +11,38 @@ class CategoriesController extends Controller
 {
     public function index()
     {
-        $categories = auth()->user()->categories()
+        $user = auth()->user();
+        $categories = $user->categories()
             ->with('bookmarks')
             ->get();
     
-        // If the user has no categories, provide default ones
+        // If the user has no categories, create default ones in the database
         if ($categories->isEmpty()) {
             $defaultCategories = [
-                ['name' => 'Web Management', 'bookmarks' => []],
-                ['name' => 'Productivity', 'bookmarks' => []],
-                ['name' => 'Web Design Memberships', 'bookmarks' => []],
-                ['name' => 'Google Properties', 'bookmarks' => []],
-                ['name' => 'Financial / Business', 'bookmarks' => []],
-                ['name' => 'Education & Learning', 'bookmarks' => []],
+                ['name' => 'Web Management'],
+                ['name' => 'Productivity'],
+                ['name' => 'Web Design Memberships'],
+                ['name' => 'Google Properties'],
+                ['name' => 'Financial / Business'],
+                ['name' => 'Education & Learning'],
                 // ... other default categories
             ];
     
             foreach ($defaultCategories as $categoryData) {
-                $categories->push((object) $categoryData);
+                $user->categories()->create($categoryData);
             }
+    
+            // Reload the categories after inserting
+            $categories = $user->categories()
+                ->with('bookmarks')
+                ->get();
         }
     
         return Inertia::render('Dashboard/Organizer', [
             'categories' => $categories,
         ]);
     }
+    
     
     
 
