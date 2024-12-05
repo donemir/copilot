@@ -1,5 +1,4 @@
 import React, { useRef, useState, useEffect } from "react";
-
 import { Inertia } from "@inertiajs/inertia";
 import { usePage, router } from "@inertiajs/react";
 
@@ -18,6 +17,12 @@ const Dashboard = () => {
     const { categories: initialCategories } = usePage().props;
     const [categories, setCategories] = useState(initialCategories || []);
 
+    const [editingCategoryId, setEditingCategoryId] = useState(null);
+    const [editingCategoryName, setEditingCategoryName] = useState("");
+
+    const [addingCategory, setAddingCategory] = useState(false);
+    const [newCategoryName, setNewCategoryName] = useState("");
+
     const [pinnedBookmarks, setPinnedBookmarks] = useState(
         initialCategories
             ? initialCategories.flatMap((category) =>
@@ -26,7 +31,11 @@ const Dashboard = () => {
             : []
     );
 
-    // Helper function to get favicon URL
+    const startEditingCategory = (category) => {
+        setEditingCategoryId(category.id);
+        setEditingCategoryName(category.name);
+    };
+
     const getFaviconUrl = (url) => {
         try {
             const hasProtocol =
@@ -41,9 +50,6 @@ const Dashboard = () => {
         }
     };
 
-    // Pre-defined categories and bookmarks
-
-    // State for the add bookmark dialog
     const [addDialogVisible, setAddDialogVisible] = useState(false);
     const [currentCategoryId, setCurrentCategoryId] = useState(null);
     const [bookmarkData, setBookmarkData] = useState({
@@ -52,18 +58,93 @@ const Dashboard = () => {
         faviconUrl: "",
     });
 
-    // State for the edit bookmark dialog
     const [editDialogVisible, setEditDialogVisible] = useState(false);
     const [currentBookmark, setCurrentBookmark] = useState(null);
 
-    // Function to open the add bookmark dialog
+    const saveCategoryName = (categoryId) => {
+        router.put(
+            `/categories/${categoryId}`,
+            { name: editingCategoryName },
+            {
+                onSuccess: () => {
+                    // Update the categories array with the new name
+                    setCategories((prev) =>
+                        prev.map((cat) =>
+                            cat.id === categoryId
+                                ? { ...cat, name: editingCategoryName }
+                                : cat
+                        )
+                    );
+                    setEditingCategoryId(null);
+                    setEditingCategoryName("");
+                    if (toast.current) {
+                        toast.current.show({
+                            severity: "success",
+                            summary: "Success",
+                            detail: "Category updated successfully.",
+                            life: 3000,
+                        });
+                    }
+                },
+                onError: (errors) => {
+                    console.error(errors);
+                    if (toast.current) {
+                        toast.current.show({
+                            severity: "error",
+                            summary: "Error",
+                            detail: "Failed to update category name.",
+                            life: 3000,
+                        });
+                    }
+                },
+            }
+        );
+    };
+
+    const addCategory = () => {
+        if (!newCategoryName.trim()) {
+            if (toast.current) {
+                toast.current.show({
+                    severity: "error",
+                    summary: "Error",
+                    detail: "Category name cannot be empty.",
+                    life: 3000,
+                });
+            }
+            return;
+        }
+
+        router.post(
+            "/categories",
+            { name: newCategoryName },
+            {
+                onSuccess: () => {
+                    // Reload categories or update state if you prefer to do so via response
+                    router.reload({ only: ["categories"] });
+                    setNewCategoryName("");
+                    setAddingCategory(false);
+                },
+                onError: (errors) => {
+                    console.error(errors);
+                    if (toast.current) {
+                        toast.current.show({
+                            severity: "error",
+                            summary: "Error",
+                            detail: "Failed to create category.",
+                            life: 3000,
+                        });
+                    }
+                },
+            }
+        );
+    };
+
     const openAddDialog = (categoryId) => {
         setCurrentCategoryId(categoryId);
         setBookmarkData({ url: "", description: "", faviconUrl: "" });
         setAddDialogVisible(true);
     };
 
-    // Add this useEffect to synchronize categories
     useEffect(() => {
         setCategories(initialCategories || []);
     }, [initialCategories]);
@@ -76,20 +157,17 @@ const Dashboard = () => {
         );
     }, [categories]);
 
-    // Function to add a new bookmark
     const addBookmark = () => {
         if (
             !bookmarkData.url.startsWith("http://") &&
             !bookmarkData.url.startsWith("https://")
         ) {
-            bookmarkData.url = "https://" + bookmarkData.url; // Use bookmarkData.url instead of url
+            bookmarkData.url = "https://" + bookmarkData.url;
         }
 
-        // Validate the URL format
         try {
             const urlObject = new URL(bookmarkData.url);
             if (!urlObject.hostname.includes(".")) {
-                console.log("Invalid URL format 1");
                 toast.current.show({
                     severity: "error",
                     summary: "Error",
@@ -99,7 +177,6 @@ const Dashboard = () => {
                 return;
             }
         } catch (error) {
-            console.log("Invalid URL format 2");
             toast.current.show({
                 severity: "error",
                 summary: "Error",
@@ -111,7 +188,6 @@ const Dashboard = () => {
 
         const faviconUrl = getFaviconUrl(bookmarkData.url);
 
-        // Use router.post instead of Inertia.post
         router.post(
             "/bookmarks",
             {
@@ -122,7 +198,6 @@ const Dashboard = () => {
             },
             {
                 onSuccess: () => {
-                    // Optionally, reload categories from the server
                     router.reload({ only: ["categories"] });
                     setAddDialogVisible(false);
                     setBookmarkData({
@@ -134,7 +209,6 @@ const Dashboard = () => {
                 },
                 onError: (errors) => {
                     console.error("Error updating bookmark:", errors);
-                    // Optionally, trigger an error toast
                     if (toast.current) {
                         toast.current.show({
                             severity: "error",
@@ -148,7 +222,6 @@ const Dashboard = () => {
         );
     };
 
-    // Function to open the edit bookmark dialog
     const openEditDialog = (bookmark, categoryId) => {
         setCurrentCategoryId(categoryId);
         setCurrentBookmark(bookmark);
@@ -160,21 +233,57 @@ const Dashboard = () => {
         setEditDialogVisible(true);
     };
 
-    // Function to save changes to an existing bookmark
+    const deleteCategory = (categoryId) => {
+        confirmDialog({
+            message: "Are you sure you want to delete this category?",
+            header: "Confirmation",
+            icon: "pi pi-exclamation-triangle",
+            acceptLabel: "Yes",
+            rejectLabel: "No",
+            accept: () => {
+                router.delete(`/categories/${categoryId}`, {
+                    onSuccess: () => {
+                        setCategories((prevCategories) =>
+                            prevCategories.filter(
+                                (cat) => cat.id !== categoryId
+                            )
+                        );
+                        if (toast.current) {
+                            toast.current.show({
+                                severity: "success",
+                                summary: "Success",
+                                detail: "Category deleted successfully.",
+                                life: 3000,
+                            });
+                        }
+                    },
+                    onError: (errors) => {
+                        console.error(errors);
+                        if (toast.current) {
+                            toast.current.show({
+                                severity: "error",
+                                summary: "Error",
+                                detail: "Failed to delete category.",
+                                life: 3000,
+                            });
+                        }
+                    },
+                });
+            },
+        });
+    };
+
     const saveBookmarkChanges = () => {
-        // Prepend 'https://' if missing
         if (
             !bookmarkData.url.startsWith("http://") &&
             !bookmarkData.url.startsWith("https://")
         ) {
-            bookmarkData.url = "https://" + url;
+            bookmarkData.url = "https://" + bookmarkData.url;
         }
 
-        // Validate the URL format
         try {
-            const urlObject = new URL(url);
+            const urlObject = new URL(bookmarkData.url);
             if (!urlObject.hostname.includes(".")) {
-                console.log("Invalid URL format 1");
                 toast.current.show({
                     severity: "error",
                     summary: "Error",
@@ -184,7 +293,6 @@ const Dashboard = () => {
                 return;
             }
         } catch (error) {
-            console.log("Invalid URL format 2");
             toast.current.show({
                 severity: "error",
                 summary: "Error",
@@ -206,12 +314,7 @@ const Dashboard = () => {
             },
             {
                 onSuccess: () => {
-                    console.log("Bookmark updated successfully");
-
-                    // Close the modal
                     setEditDialogVisible(false);
-
-                    // Reset bookmark data
                     setBookmarkData({
                         url: "",
                         description: "",
@@ -220,7 +323,6 @@ const Dashboard = () => {
                     setCurrentBookmark(null);
                     setCurrentCategoryId(null);
 
-                    // Optionally, trigger a success toast
                     if (toast.current) {
                         toast.current.show({
                             severity: "success",
@@ -232,8 +334,6 @@ const Dashboard = () => {
                 },
                 onError: (errors) => {
                     console.error("Error updating bookmark:", errors);
-
-                    // Optionally, trigger an error toast
                     if (toast.current) {
                         toast.current.show({
                             severity: "error",
@@ -247,7 +347,6 @@ const Dashboard = () => {
         );
     };
 
-    // Function to delete a bookmark
     const deleteBookmark = (bookmarkId, categoryId) => {
         confirmDialog({
             message: "Are you sure you want to delete this bookmark?",
@@ -258,7 +357,6 @@ const Dashboard = () => {
             accept: () => {
                 router.delete(`/bookmarks/${bookmarkId}`, {
                     onSuccess: () => {
-                        // Remove the bookmark from local state
                         setCategories((prevCategories) =>
                             prevCategories.map((category) => {
                                 if (category.id === categoryId) {
@@ -274,7 +372,6 @@ const Dashboard = () => {
                                 }
                             })
                         );
-                        // Also remove from pinned bookmarks if necessary
                         setPinnedBookmarks((prevPinned) =>
                             prevPinned.filter(
                                 (bookmark) => bookmark.id !== bookmarkId
@@ -289,7 +386,6 @@ const Dashboard = () => {
         });
     };
 
-    // Function to toggle pinning a bookmark
     const togglePinBookmark = (bookmark, categoryId) => {
         const newPinnedStatus = !bookmark.pinned;
 
@@ -300,7 +396,6 @@ const Dashboard = () => {
             },
             {
                 onSuccess: () => {
-                    // Update the bookmark's pinned status in local state
                     setCategories((prevCategories) =>
                         prevCategories.map((category) => {
                             if (category.id === categoryId) {
@@ -318,7 +413,6 @@ const Dashboard = () => {
                         })
                     );
 
-                    // Update pinnedBookmarks array
                     if (newPinnedStatus) {
                         setPinnedBookmarks((prevPinned) => [
                             ...prevPinned,
@@ -337,82 +431,127 @@ const Dashboard = () => {
         );
     };
 
-    // Handler for drag end
+    // Helper function to reorder an array
+    const reorder = (list, startIndex, endIndex) => {
+        const result = Array.from(list);
+        const [removed] = result.splice(startIndex, 1);
+        result.splice(endIndex, 0, removed);
+        return result;
+    };
+
     const onDragEnd = (result) => {
         if (!result.destination) return;
 
-        const { source, destination } = result;
+        const { source, destination, type } = result;
 
-        // Handle drag and drop within pinned bookmarks (if applicable)
-        if (
-            source.droppableId === "pinned" &&
-            destination.droppableId === "pinned"
-        ) {
-            // ... existing code for pinned bookmarks
+        if (type === "category") {
+            // Reorder categories in local state
+            const newCategories = reorder(
+                categories,
+                source.index,
+                destination.index
+            );
+            setCategories(newCategories);
+
+            // Prepare data for the backend
+            const reorderData = newCategories.map((cat, idx) => ({
+                id: cat.id,
+                order: idx, // or idx + 1, depending on how you count
+            }));
+
+            // Send updated order to the backend
+            router.put(
+                "/categories/reorder",
+                { categories: reorderData },
+                {
+                    onSuccess: () => {
+                        console.log("Categories reordered successfully");
+                        // Optionally show a toast if needed:
+                        // toast.current.show({ severity: 'success', summary: 'Success', detail: 'Categories order updated.', life: 3000 });
+                    },
+                    onError: (errors) => {
+                        console.error("Error reordering categories:", errors);
+                        // Optionally show a toast:
+                        // toast.current.show({ severity: 'error', summary: 'Error', detail: 'Failed to reorder categories.', life: 3000 });
+                    },
+                }
+            );
+
             return;
         }
 
-        // Handle drag and drop within categories
-        const sourceCategory = categories.find(
-            (category) => category.id.toString() === source.droppableId
-        );
-        const destCategory = categories.find(
-            (category) => category.id.toString() === destination.droppableId
-        );
-
-        if (!sourceCategory || !destCategory) return;
-
-        // Get the item being moved
-        const movingItem = sourceCategory.bookmarks[source.index];
-
-        // Remove the item from the source category
-        const newSourceBookmarks = Array.from(sourceCategory.bookmarks);
-        newSourceBookmarks.splice(source.index, 1);
-
-        // Add the item to the destination category
-        const newDestBookmarks = Array.from(destCategory.bookmarks);
-        newDestBookmarks.splice(destination.index, 0, movingItem);
-
-        // Update the categories
-        setCategories((prevCategories) =>
-            prevCategories.map((category) => {
-                if (category.id === sourceCategory.id) {
-                    return { ...category, bookmarks: newSourceBookmarks };
-                } else if (category.id === destCategory.id) {
-                    return { ...category, bookmarks: newDestBookmarks };
-                } else {
-                    return category;
-                }
-            })
-        );
-
-        // Update the bookmark's category_id in the backend
-        router.put(
-            `/bookmarks/${movingItem.id}`,
-            {
-                category_id: destCategory.id,
-            },
-            {
-                onSuccess: () => {
-                    console.log("Bookmark category updated successfully");
-                    // Since we've updated the local state optimistically, no further action is needed
-                },
-                onError: (errors) => {
-                    console.error("Error updating bookmark category:", errors);
-                    // Optionally, revert state changes if needed
-                },
+        if (type === "bookmark") {
+            // Handle bookmarks (either pinned or within categories)
+            if (
+                source.droppableId === "pinned" &&
+                destination.droppableId === "pinned"
+            ) {
+                // Reordering pinned bookmarks
+                const newPinned = reorder(
+                    pinnedBookmarks,
+                    source.index,
+                    destination.index
+                );
+                setPinnedBookmarks(newPinned);
+                return;
             }
-        );
+
+            // It's a bookmark in a category
+            const sourceCategory = categories.find(
+                (category) => category.id.toString() === source.droppableId
+            );
+            const destCategory = categories.find(
+                (category) => category.id.toString() === destination.droppableId
+            );
+
+            if (!sourceCategory || !destCategory) return;
+
+            const movingItem = sourceCategory.bookmarks[source.index];
+
+            const newSourceBookmarks = Array.from(sourceCategory.bookmarks);
+            newSourceBookmarks.splice(source.index, 1);
+
+            const newDestBookmarks = Array.from(destCategory.bookmarks);
+            newDestBookmarks.splice(destination.index, 0, movingItem);
+
+            setCategories((prevCategories) =>
+                prevCategories.map((category) => {
+                    if (category.id === sourceCategory.id) {
+                        return { ...category, bookmarks: newSourceBookmarks };
+                    } else if (category.id === destCategory.id) {
+                        return { ...category, bookmarks: newDestBookmarks };
+                    } else {
+                        return category;
+                    }
+                })
+            );
+
+            router.put(
+                `/bookmarks/${movingItem.id}`,
+                {
+                    category_id: destCategory.id,
+                },
+                {
+                    onSuccess: () => {
+                        console.log("Bookmark category updated successfully");
+                    },
+                    onError: (errors) => {
+                        console.error(
+                            "Error updating bookmark category:",
+                            errors
+                        );
+                    },
+                }
+            );
+        }
     };
 
     return (
         <Layout>
             <Toast ref={toast} />
             <div className="grid">
-                {/* Confirm Dialog (for deletion confirmation) */}
                 <ConfirmDialog />
 
-                {/* Pinned Bookmarks Section */}
                 {pinnedBookmarks.length > 0 && (
                     <div className="col-12">
                         <div className="card">
@@ -421,10 +560,11 @@ const Dashboard = () => {
                                 <Droppable
                                     droppableId="pinned"
                                     direction="horizontal"
+                                    type="bookmark"
                                 >
                                     {(provided) => (
                                         <div
-                                            className="flex flex-wrap" // Added 'flex-wrap' here
+                                            className="flex flex-wrap"
                                             ref={provided.innerRef}
                                             {...provided.droppableProps}
                                         >
@@ -434,6 +574,7 @@ const Dashboard = () => {
                                                         key={bookmark.id}
                                                         draggableId={bookmark.id.toString()}
                                                         index={index}
+                                                        type="bookmark"
                                                     >
                                                         {(
                                                             provided,
@@ -498,12 +639,11 @@ const Dashboard = () => {
                                                                         onClick={() =>
                                                                             togglePinBookmark(
                                                                                 bookmark,
-                                                                                // Find the category ID
                                                                                 categories.find(
                                                                                     (
-                                                                                        category
+                                                                                        cat
                                                                                     ) =>
-                                                                                        category.bookmarks.some(
+                                                                                        cat.bookmarks.some(
                                                                                             (
                                                                                                 b
                                                                                             ) =>
@@ -531,188 +671,339 @@ const Dashboard = () => {
                     </div>
                 )}
 
-                {/* Display Categories and Bookmarks with Drag and Drop */}
+                {/* 
+                  NEW: Wrap categories in a Droppable with type="category"
+                  This will allow us to reorder categories themselves.
+                */}
                 <DragDropContext onDragEnd={onDragEnd}>
-                    {categories.map((category) => (
-                        <div
-                            key={category.id}
-                            className="bookmarks-list col-12 md:col-6 lg:col-4"
-                        >
-                            <div className="card">
-                                <div className="flex justify-content-between align-items-center">
-                                    <h5>{category.name}</h5>
-                                    <Button
-                                        icon="pi pi-plus"
-                                        className="p-button-rounded p-button-text"
-                                        onClick={() =>
-                                            openAddDialog(category.id)
-                                        }
-                                        tooltip="Add Bookmark"
-                                        tooltipOptions={{ position: "top" }}
-                                    />
-                                </div>
-
-                                <Droppable droppableId={category.id.toString()}>
-                                    {(provided, snapshot) => (
-                                        <div
-                                            ref={provided.innerRef}
-                                            {...provided.droppableProps}
-                                            className={`min-h-20 ${
-                                                snapshot.isDraggingOver
-                                                    ? "border-primary border-dashed"
-                                                    : ""
-                                            }`}
-                                        >
-                                            {category.bookmarks.length === 0 ? (
-                                                <p>
-                                                    No bookmarks yet. Add one!
-                                                </p>
-                                            ) : (
-                                                <ul className="list-none  p-0 m-0">
-                                                    {category.bookmarks.map(
-                                                        (bookmark, index) => (
-                                                            <Draggable
-                                                                key={
-                                                                    bookmark.id
+                    <Droppable
+                        droppableId="categories"
+                        type="category"
+                        direction="horizontal"
+                    >
+                        {(provided) => (
+                            <div
+                                ref={provided.innerRef}
+                                {...provided.droppableProps}
+                                className="grid"
+                            >
+                                {categories.map((category, categoryIndex) => (
+                                    <Draggable
+                                        key={category.id}
+                                        draggableId={`category-${category.id}`}
+                                        index={categoryIndex}
+                                        type="category"
+                                    >
+                                        {(provided) => (
+                                            <div
+                                                className="bookmarks-list col-12 md:col-6 lg:col-4"
+                                                ref={provided.innerRef}
+                                                {...provided.draggableProps}
+                                            >
+                                                <div className="card">
+                                                    {/* Use dragHandleProps on a drag handle - for example, the header */}
+                                                    <div
+                                                        className="flex justify-content-between align-items-center"
+                                                        {...provided.dragHandleProps}
+                                                    >
+                                                        {editingCategoryId ===
+                                                        category.id ? (
+                                                            <InputText
+                                                                value={
+                                                                    editingCategoryName
                                                                 }
-                                                                draggableId={bookmark.id.toString()}
-                                                                index={index}
+                                                                onChange={(e) =>
+                                                                    setEditingCategoryName(
+                                                                        e.target
+                                                                            .value
+                                                                    )
+                                                                }
+                                                                onBlur={() =>
+                                                                    saveCategoryName(
+                                                                        category.id
+                                                                    )
+                                                                }
+                                                                onKeyDown={(
+                                                                    e
+                                                                ) => {
+                                                                    if (
+                                                                        e.key ===
+                                                                        "Enter"
+                                                                    )
+                                                                        saveCategoryName(
+                                                                            category.id
+                                                                        );
+                                                                }}
+                                                                autoFocus
+                                                            />
+                                                        ) : (
+                                                            <h5
+                                                                onDoubleClick={() =>
+                                                                    startEditingCategory(
+                                                                        category
+                                                                    )
+                                                                }
                                                             >
-                                                                {(
-                                                                    provided,
-                                                                    snapshot
-                                                                ) => (
-                                                                    <li
-                                                                        className={`list-none mb-2 p-2 border-round ${
-                                                                            snapshot.isDragging
-                                                                                ? "surface-200"
-                                                                                : "surface-100"
-                                                                        }`}
-                                                                        ref={
-                                                                            provided.innerRef
-                                                                        }
-                                                                        {...provided.draggableProps}
-                                                                        {...provided.dragHandleProps}
-                                                                    >
-                                                                        <div className="flex justify-content-between align-items-start">
-                                                                            <div className="flex">
-                                                                                {bookmark.favicon_url && (
-                                                                                    <img
-                                                                                        src={
-                                                                                            bookmark.favicon_url
-                                                                                        }
-                                                                                        alt="favicon"
-                                                                                        onError={(
-                                                                                            e
-                                                                                        ) => {
-                                                                                            e.target.onerror =
-                                                                                                null;
-                                                                                            e.target.style.display =
-                                                                                                "none";
-                                                                                        }}
-                                                                                        style={{
-                                                                                            width: "16px",
-                                                                                            height: "16px",
-                                                                                            marginRight:
-                                                                                                "8px",
-                                                                                        }}
-                                                                                    />
-                                                                                )}
-                                                                                <div>
-                                                                                    <a
-                                                                                        href={
-                                                                                            bookmark.url.startsWith(
-                                                                                                "http://"
-                                                                                            ) ||
-                                                                                            bookmark.url.startsWith(
-                                                                                                "https://"
-                                                                                            )
-                                                                                                ? bookmark.url
-                                                                                                : `http://${bookmark.url}`
-                                                                                        }
-                                                                                        target="_blank"
-                                                                                        rel="noopener noreferrer"
-                                                                                        className="text-primary hover:underline"
-                                                                                    >
-                                                                                        {bookmark.description ||
-                                                                                            bookmark.url}
-                                                                                    </a>
-                                                                                </div>
-                                                                            </div>
-                                                                            <div className="flex">
-                                                                                <Button
-                                                                                    icon={
-                                                                                        bookmark.pinned
-                                                                                            ? "pi pi-bookmark-fill"
-                                                                                            : "pi pi-bookmark"
-                                                                                    }
-                                                                                    className={`p-button-text p-button-sm p-button-rounded ${
-                                                                                        bookmark.pinned
-                                                                                            ? "text-warning"
-                                                                                            : ""
-                                                                                    }`}
-                                                                                    onClick={() =>
-                                                                                        togglePinBookmark(
-                                                                                            bookmark,
-                                                                                            category.id
-                                                                                        )
-                                                                                    }
-                                                                                    tooltip={
-                                                                                        bookmark.pinned
-                                                                                            ? "Unpin Bookmark"
-                                                                                            : "Pin Bookmark"
-                                                                                    }
-                                                                                    tooltipOptions={{
-                                                                                        position:
-                                                                                            "top",
-                                                                                    }}
-                                                                                />
-                                                                                <Button
-                                                                                    icon="pi pi-pencil"
-                                                                                    className="p-button-text p-button-sm p-button-rounded"
-                                                                                    onClick={() =>
-                                                                                        openEditDialog(
-                                                                                            bookmark,
-                                                                                            category.id
-                                                                                        )
-                                                                                    }
-                                                                                    tooltip="Edit Bookmark"
-                                                                                    tooltipOptions={{
-                                                                                        position:
-                                                                                            "top",
-                                                                                    }}
-                                                                                />
-                                                                                <Button
-                                                                                    icon="pi pi-trash"
-                                                                                    className="p-button-text p-button-sm p-button-rounded p-button-danger"
-                                                                                    onClick={() =>
-                                                                                        deleteBookmark(
-                                                                                            bookmark.id,
-                                                                                            category.id
-                                                                                        )
-                                                                                    }
-                                                                                    tooltip="Delete Bookmark"
-                                                                                    tooltipOptions={{
-                                                                                        position:
-                                                                                            "top",
-                                                                                    }}
-                                                                                />
-                                                                            </div>
+                                                                {category.name}
+                                                            </h5>
+                                                        )}
+                                                        <Button
+                                                            icon="pi pi-plus"
+                                                            className="p-button-rounded p-button-text"
+                                                            onClick={() =>
+                                                                openAddDialog(
+                                                                    category.id
+                                                                )
+                                                            }
+                                                            tooltip="Add Bookmark"
+                                                            tooltipOptions={{
+                                                                position: "top",
+                                                            }}
+                                                        />
+                                                    </div>
+
+                                                    {/* The droppable for bookmarks within this category */}
+                                                    <Droppable
+                                                        droppableId={category.id.toString()}
+                                                        type="bookmark"
+                                                    >
+                                                        {(
+                                                            provided,
+                                                            snapshot
+                                                        ) => (
+                                                            <div
+                                                                ref={
+                                                                    provided.innerRef
+                                                                }
+                                                                {...provided.droppableProps}
+                                                                className={`min-h-20 ${
+                                                                    snapshot.isDraggingOver
+                                                                        ? "border-primary border-dashed"
+                                                                        : ""
+                                                                }`}
+                                                            >
+                                                                {category
+                                                                    .bookmarks
+                                                                    .length ===
+                                                                0 ? (
+                                                                    <div>
+                                                                        <p>
+                                                                            No
+                                                                            bookmarks
+                                                                            yet.
+                                                                            Add
+                                                                            one!
+                                                                        </p>
+                                                                        <div
+                                                                            style={{
+                                                                                marginTop:
+                                                                                    "1rem",
+                                                                            }}
+                                                                        >
+                                                                            <Button
+                                                                                label="Delete Category"
+                                                                                icon="pi pi-trash"
+                                                                                className="p-button-danger p-button-text"
+                                                                                onClick={() =>
+                                                                                    deleteCategory(
+                                                                                        category.id
+                                                                                    )
+                                                                                }
+                                                                            />
                                                                         </div>
-                                                                    </li>
+                                                                    </div>
+                                                                ) : (
+                                                                    <ul className="list-none p-0 m-0">
+                                                                        {category.bookmarks.map(
+                                                                            (
+                                                                                bookmark,
+                                                                                index
+                                                                            ) => (
+                                                                                <Draggable
+                                                                                    key={
+                                                                                        bookmark.id
+                                                                                    }
+                                                                                    draggableId={bookmark.id.toString()}
+                                                                                    index={
+                                                                                        index
+                                                                                    }
+                                                                                    type="bookmark"
+                                                                                >
+                                                                                    {(
+                                                                                        provided,
+                                                                                        snapshot
+                                                                                    ) => (
+                                                                                        <li
+                                                                                            className={`list-none mb-2 p-2 border-round ${
+                                                                                                snapshot.isDragging
+                                                                                                    ? "surface-200"
+                                                                                                    : "surface-100"
+                                                                                            }`}
+                                                                                            ref={
+                                                                                                provided.innerRef
+                                                                                            }
+                                                                                            {...provided.draggableProps}
+                                                                                            {...provided.dragHandleProps}
+                                                                                        >
+                                                                                            <div className="flex justify-content-between align-items-start">
+                                                                                                <div className="flex">
+                                                                                                    {bookmark.favicon_url && (
+                                                                                                        <img
+                                                                                                            src={
+                                                                                                                bookmark.favicon_url
+                                                                                                            }
+                                                                                                            alt="favicon"
+                                                                                                            onError={(
+                                                                                                                e
+                                                                                                            ) => {
+                                                                                                                e.target.onerror =
+                                                                                                                    null;
+                                                                                                                e.target.style.display =
+                                                                                                                    "none";
+                                                                                                            }}
+                                                                                                            style={{
+                                                                                                                width: "16px",
+                                                                                                                height: "16px",
+                                                                                                                marginRight:
+                                                                                                                    "8px",
+                                                                                                            }}
+                                                                                                        />
+                                                                                                    )}
+                                                                                                    <div>
+                                                                                                        <a
+                                                                                                            href={
+                                                                                                                bookmark.url.startsWith(
+                                                                                                                    "http://"
+                                                                                                                ) ||
+                                                                                                                bookmark.url.startsWith(
+                                                                                                                    "https://"
+                                                                                                                )
+                                                                                                                    ? bookmark.url
+                                                                                                                    : `http://${bookmark.url}`
+                                                                                                            }
+                                                                                                            target="_blank"
+                                                                                                            rel="noopener noreferrer"
+                                                                                                            className="text-primary hover:underline"
+                                                                                                        >
+                                                                                                            {bookmark.description ||
+                                                                                                                bookmark.url}
+                                                                                                        </a>
+                                                                                                    </div>
+                                                                                                </div>
+                                                                                                <div className="flex">
+                                                                                                    <Button
+                                                                                                        icon={
+                                                                                                            bookmark.pinned
+                                                                                                                ? "pi pi-bookmark-fill"
+                                                                                                                : "pi pi-bookmark"
+                                                                                                        }
+                                                                                                        className={`p-button-text p-button-sm p-button-rounded ${
+                                                                                                            bookmark.pinned
+                                                                                                                ? "text-warning"
+                                                                                                                : ""
+                                                                                                        }`}
+                                                                                                        onClick={() =>
+                                                                                                            togglePinBookmark(
+                                                                                                                bookmark,
+                                                                                                                category.id
+                                                                                                            )
+                                                                                                        }
+                                                                                                        tooltip={
+                                                                                                            bookmark.pinned
+                                                                                                                ? "Unpin Bookmark"
+                                                                                                                : "Pin Bookmark"
+                                                                                                        }
+                                                                                                        tooltipOptions={{
+                                                                                                            position:
+                                                                                                                "top",
+                                                                                                        }}
+                                                                                                    />
+                                                                                                    <Button
+                                                                                                        icon="pi pi-pencil"
+                                                                                                        className="p-button-text p-button-sm p-button-rounded"
+                                                                                                        onClick={() =>
+                                                                                                            openEditDialog(
+                                                                                                                bookmark,
+                                                                                                                category.id
+                                                                                                            )
+                                                                                                        }
+                                                                                                        tooltip="Edit Bookmark"
+                                                                                                        tooltipOptions={{
+                                                                                                            position:
+                                                                                                                "top",
+                                                                                                        }}
+                                                                                                    />
+                                                                                                    <Button
+                                                                                                        icon="pi pi-trash"
+                                                                                                        className="p-button-text p-button-sm p-button-rounded p-button-danger"
+                                                                                                        onClick={() =>
+                                                                                                            deleteBookmark(
+                                                                                                                bookmark.id,
+                                                                                                                category.id
+                                                                                                            )
+                                                                                                        }
+                                                                                                        tooltip="Delete Bookmark"
+                                                                                                        tooltipOptions={{
+                                                                                                            position:
+                                                                                                                "top",
+                                                                                                        }}
+                                                                                                    />
+                                                                                                </div>
+                                                                                            </div>
+                                                                                        </li>
+                                                                                    )}
+                                                                                </Draggable>
+                                                                            )
+                                                                        )}
+                                                                    </ul>
                                                                 )}
-                                                            </Draggable>
-                                                        )
-                                                    )}
-                                                </ul>
-                                            )}
-                                            {provided.placeholder}
-                                        </div>
-                                    )}
-                                </Droppable>
+                                                                {
+                                                                    provided.placeholder
+                                                                }
+                                                            </div>
+                                                        )}
+                                                    </Droppable>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </Draggable>
+                                ))}
+                                {provided.placeholder}
+                            </div>
+                        )}
+                    </Droppable>
+                    {addingCategory ? (
+                        <div className="col-12" style={{ marginTop: "1rem" }}>
+                            <div className="p-inputgroup">
+                                <InputText
+                                    value={newCategoryName}
+                                    onChange={(e) =>
+                                        setNewCategoryName(e.target.value)
+                                    }
+                                    placeholder="New Category Name"
+                                />
+                                <Button
+                                    label="Save"
+                                    icon="pi pi-check"
+                                    onClick={addCategory}
+                                />
+                                <Button
+                                    label="Cancel"
+                                    icon="pi pi-times"
+                                    className="p-button-secondary"
+                                    onClick={() => setAddingCategory(false)}
+                                />
                             </div>
                         </div>
-                    ))}
+                    ) : (
+                        <div className="col-12" style={{ marginTop: "1rem" }}>
+                            <Button
+                                label="Add New Category"
+                                icon="pi pi-plus"
+                                onClick={() => setAddingCategory(true)}
+                            />
+                        </div>
+                    )}
                 </DragDropContext>
 
                 {/* Add Bookmark Dialog */}

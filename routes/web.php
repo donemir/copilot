@@ -50,6 +50,11 @@ Route::middleware('auth')->group(function () {
 
     // Categories
     Route::post('/categories', [CategoriesController::class, 'store'])->name('categories.store');
+    Route::put('/categories/reorder', [CategoriesController::class, 'reorder'])->name('categories.reorder');
+    Route::put('/categories/{category}', [CategoriesController::class, 'update'])->name('categories.update');
+    Route::delete('/categories/{category}', [CategoriesController::class, 'destroy'])->name('categories.destroy');
+
+
     // Route::get('/test', [CategoriesController::class, 'index'])->name('test');
     Route::get('/organizer', [CategoriesController::class, 'index'])->name('organizer');
     // Add update and delete routes for categories if needed

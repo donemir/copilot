@@ -3,7 +3,9 @@
 namespace App\Providers;
 
 use App\Models\Bookmark;
+use App\Models\Category;
 use App\Policies\BookmarkPolicy;
+use App\Policies\CategoryPolicy;
 // use Illuminate\Support\Facades\Gate;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
 
@@ -16,6 +18,7 @@ class AuthServiceProvider extends ServiceProvider
      */
     protected $policies = [
         Bookmark::class => BookmarkPolicy::class,
+        Category::class => CategoryPolicy::class,
     ];
 
     /**

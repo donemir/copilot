@@ -12,7 +12,7 @@ class Category extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['name', 'user_id'];
+    protected $fillable = ['name', 'user_id', 'order'];
 
     public function user(): BelongsTo
     {

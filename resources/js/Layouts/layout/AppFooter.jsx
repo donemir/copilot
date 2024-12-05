@@ -1,13 +1,27 @@
-import React, { useContext } from "react";
+import React, { useState, useEffect } from "react";
 
 const AppFooter = () => {
+    const [currentTime, setCurrentTime] = useState(new Date());
+
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setCurrentTime(new Date());
+        }, 1000);
+
+        return () => clearInterval(timer);
+    }, []);
+
+    const formattedDate = currentTime.toLocaleDateString();
+    const formattedTime = currentTime.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+    });
+
     return (
         <div className="layout-footer">
             <span>
-                Made with <span className="text-red-500">&#10084;&#65039;</span>{" "}
-                in
+                {formattedDate} {formattedTime}
             </span>
-            <span className="font-medium ml-2">Vancouver, BC, Canada</span>
         </div>
     );
 };
