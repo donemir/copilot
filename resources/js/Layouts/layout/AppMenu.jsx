@@ -17,6 +17,11 @@ const AppMenu = () => {
                     to: route("organizer"),
                 },
                 {
+                    label: "Pomodoro",
+                    icon: "pi pi-fw pi-stopwatch",
+                    to: route("pomodoro"),
+                },
+                {
                     label: "Dashboard",
                     icon: "pi pi-fw pi-home",
                     to: route("dashboard"),

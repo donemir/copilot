@@ -14,7 +14,7 @@ import { resolvePageComponent } from "laravel-vite-plugin/inertia-helpers";
 import { LayoutProvider } from "@/Layouts/layout/context/layoutcontext.jsx";
 import { PrimeReactProvider } from "primereact/api";
 
-const appName = import.meta.env.VITE_APP_NAME || "Laravel";
+const appName = import.meta.env.VITE_APP_NAME || "Dashboard";
 
 createInertiaApp({
     title: (title) => `${title} - ${appName}`,

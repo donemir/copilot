@@ -33,6 +33,11 @@ Route::get('/dashboard', function () {
     return Inertia::render('Dashboard');
 })
     ->name('dashboard');
+
+    Route::get('/pomodoro', function () {
+        return Inertia::render('Pomodoro');
+    })
+        ->name('pomodoro');
 //    ->middleware(['auth', 'verified'])->name('dashboard');
 
 // Route::get('/test', function () {
