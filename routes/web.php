@@ -5,6 +5,7 @@ use Illuminate\Foundation\Application;
 
 use App\Http\Controllers\CategoriesController;
 use App\Http\Controllers\BookmarksController;
+use App\Http\Controllers\UserSettingsController;
 
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -49,6 +50,10 @@ Route::get('/organizer', function () {
 //   ->middleware(['auth', 'verified']); // Apply the middleware if needed
 
 Route::middleware('auth')->group(function () {
+
+    Route::put('/user-settings', [UserSettingsController::class, 'update'])
+         ->name('user-settings.update');
+
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');

@@ -55,4 +55,9 @@ class User extends Authenticatable
     {
         return $this->hasMany(Bookmark::class);
     }
+
+    public function settings()
+    {
+        return $this->hasOne(UserSetting::class);
+    }
 }

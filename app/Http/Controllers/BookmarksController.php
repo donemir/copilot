@@ -51,7 +51,7 @@ class BookmarksController extends Controller
             'pinned' => false,
         ]);
     
-        return redirect()->back()->with('success', 'Bookmark added successfully.')->withStatus(303);
+        return redirect()->back()->with('success', 'Link added successfully.')->withStatus(303);
     }
     
 
@@ -98,7 +98,7 @@ class BookmarksController extends Controller
         $categories = auth()->user()->categories()->with('bookmarks')->get();
     
         // Return an Inertia response with the correct component name
-        return redirect()->route('organizer')->with('success', 'Bookmark updated successfully.')->setStatusCode(303);
+        return redirect()->route('organizer')->with('success', 'Link updated successfully.')->setStatusCode(303);
 
     }
    
@@ -109,6 +109,6 @@ class BookmarksController extends Controller
 
         $bookmark->delete();
 
-        return redirect()->back()->with('success', 'Bookmark deleted successfully.')->withStatus(303);
+        return redirect()->back()->with('success', 'Link deleted successfully.')->withStatus(303);
     }
 }

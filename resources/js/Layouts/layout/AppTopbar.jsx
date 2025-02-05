@@ -1,5 +1,3 @@
-/* eslint-disable @next/next/no-img-element */
-
 import { classNames } from "primereact/utils";
 import React, {
     forwardRef,
@@ -8,11 +6,22 @@ import React, {
     useRef,
 } from "react";
 import { LayoutContext } from "./context/layoutcontext";
-import { Link } from "@inertiajs/react";
+import { Link, router } from "@inertiajs/react";
+import { PrimeReactContext } from "primereact/api";
+import { Button } from "primereact/button";
 
 const AppTopbar = forwardRef((props, ref) => {
-    const { layoutConfig, layoutState, onMenuToggle, showProfileSidebar } =
-        useContext(LayoutContext);
+    // Get layout configuration and actions from LayoutContext.
+    const {
+        layoutConfig,
+        layoutState,
+        onMenuToggle,
+        showProfileSidebar,
+        setLayoutConfig,
+    } = useContext(LayoutContext);
+    // Get the changeTheme function from PrimeReactContext.
+    const { changeTheme } = useContext(PrimeReactContext);
+
     const menubuttonRef = useRef(null);
     const topbarmenuRef = useRef(null);
     const topbarmenubuttonRef = useRef(null);
@@ -23,18 +32,52 @@ const AppTopbar = forwardRef((props, ref) => {
         topbarmenubutton: topbarmenubuttonRef.current,
     }));
 
+    // Toggle between light and dark mode themes and save the setting via Inertia.
+    const toggleTheme = () => {
+        if (layoutConfig.colorScheme === "light") {
+            // Switch to dark theme (e.g., Material Dark Indigo)
+            changeTheme?.(
+                layoutConfig.theme,
+                "md-dark-indigo",
+                "theme-css",
+                () => {
+                    setLayoutConfig((prevState) => ({
+                        ...prevState,
+                        theme: "md-dark-indigo",
+                        colorScheme: "dark",
+                    }));
+                    // Persist the setting in the backend.
+                    router.put("/user-settings", { theme: "dark" });
+                }
+            );
+        } else {
+            // Switch to light theme (e.g., Material Light Indigo)
+            changeTheme?.(
+                layoutConfig.theme,
+                "md-light-indigo",
+                "theme-css",
+                () => {
+                    setLayoutConfig((prevState) => ({
+                        ...prevState,
+                        theme: "md-light-indigo",
+                        colorScheme: "light",
+                    }));
+                    // Persist the setting in the backend.
+                    router.put("/user-settings", { theme: "light" });
+                }
+            );
+        }
+    };
+
     return (
         <div className="layout-topbar">
             <Link href="/" className="layout-topbar-logo">
-                {/* <img src={`/images/logo/-${layoutConfig.colorScheme !== 'light' ? 'white' : 'dark'}.svg`} width="100.22px" height={'35px'} alt="logo" /> */}
                 <img
                     src={`/images/logo/svg-logo.svg`}
                     width="100.22px"
-                    height={"35px"}
+                    height="35px"
                     alt="logo"
                 />
-
-                {/*<span>LaraReact</span>*/}
             </Link>
 
             <button
@@ -45,6 +88,19 @@ const AppTopbar = forwardRef((props, ref) => {
             >
                 <i className="pi pi-bars" />
             </button>
+
+            {/* Theme Toggle Button */}
+            <Button
+                icon={
+                    layoutConfig.colorScheme === "light"
+                        ? "pi pi-sun"
+                        : "pi pi-moon"
+                }
+                className="p-button-rounded p-button-text"
+                onClick={toggleTheme}
+                tooltip="Toggle Light/Dark Mode"
+                tooltipOptions={{ position: "bottom" }}
+            />
 
             <button
                 ref={topbarmenubuttonRef}
@@ -84,5 +140,4 @@ const AppTopbar = forwardRef((props, ref) => {
 });
 
 AppTopbar.displayName = "AppTopbar";
-
 export default AppTopbar;

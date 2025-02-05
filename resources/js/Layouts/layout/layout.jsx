@@ -1,4 +1,3 @@
-/* eslint-disable react-hooks/exhaustive-deps */
 import {
     useEventListener,
     useMountEffect,
@@ -17,11 +16,14 @@ import { Toast } from "primereact/toast";
 // import { usePathname, useSearchParams } from "next/navigation";
 
 const Layout = ({ children }) => {
-    const { flash = {} } = usePage().props;
+    const { flash = {}, userSettings } = usePage().props;
     const toast = useRef(null);
 
-    const { layoutConfig, layoutState, setLayoutState } =
+    const { layoutConfig, setLayoutConfig, layoutState, setLayoutState } =
         useContext(LayoutContext);
+
+    const { changeTheme } = useContext(PrimeReactContext);
+
     const { setRipple } = useContext(PrimeReactContext);
     const topbarRef = useRef(null);
     const sidebarRef = useRef(null);
@@ -44,6 +46,31 @@ const Layout = ({ children }) => {
         });
 
     const pathname = route().current();
+
+    // Check userSettings on mount or update, and call changeTheme if needed
+    useEffect(() => {
+        if (userSettings && userSettings.theme) {
+            // Convert "dark" => "md-dark-indigo", "light" => "md-light-indigo"
+            const newTheme =
+                userSettings.theme === "dark"
+                    ? "md-dark-indigo"
+                    : "md-light-indigo";
+
+            // Only change if the userSetting theme differs from current layoutConfig.theme
+            if (layoutConfig.theme !== newTheme) {
+                // Call changeTheme to update the <link id="theme-css"> href
+                changeTheme?.(layoutConfig.theme, newTheme, "theme-css", () => {
+                    // Once loaded, update LayoutContext state so everything stays in sync
+                    setLayoutConfig((prev) => ({
+                        ...prev,
+                        theme: newTheme,
+                        colorScheme: userSettings.theme,
+                    }));
+                });
+            }
+        }
+    }, [userSettings, layoutConfig.theme, setLayoutConfig, changeTheme]);
+
     // const searchParams = useSearchParams();
     useEffect(() => {
         hideMenu();

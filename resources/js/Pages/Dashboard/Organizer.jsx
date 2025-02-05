@@ -1,73 +1,95 @@
 import React, { useRef, useState, useEffect } from "react";
-import { Inertia } from "@inertiajs/inertia";
 import { usePage, router } from "@inertiajs/react";
 
 import { Button } from "primereact/button";
 import { InputText } from "primereact/inputtext";
 import { InputTextarea } from "primereact/inputtextarea";
-import Layout from "@/Layouts/layout/layout.jsx";
-import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
 import { Dialog } from "primereact/dialog";
 import { ConfirmDialog, confirmDialog } from "primereact/confirmdialog";
 import { Toast } from "primereact/toast";
+import { Menu } from "primereact/menu";
+import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
+
+import Layout from "@/Layouts/layout/layout.jsx";
 
 const Dashboard = () => {
     const toast = useRef(null);
 
     const { categories: initialCategories } = usePage().props;
     const [categories, setCategories] = useState(initialCategories || []);
-
-    const [editingCategoryId, setEditingCategoryId] = useState(null);
-    const [editingCategoryName, setEditingCategoryName] = useState("");
-
-    const [addingCategory, setAddingCategory] = useState(false);
-    const [newCategoryName, setNewCategoryName] = useState("");
-
-    const [pinnedBookmarks, setPinnedBookmarks] = useState(
+    const [pinnedLinks, setPinnedLinks] = useState(
         initialCategories
-            ? initialCategories.flatMap((category) =>
-                  category.bookmarks.filter((bookmark) => bookmark.pinned)
+            ? initialCategories.flatMap((cat) =>
+                  cat.bookmarks.filter((link) => link.pinned)
               )
             : []
     );
 
-    const startEditingCategory = (category) => {
-        setEditingCategoryId(category.id);
-        setEditingCategoryName(category.name);
-    };
+    // Inline editing category names
+    const [editingCategoryId, setEditingCategoryId] = useState(null);
+    const [editingCategoryName, setEditingCategoryName] = useState("");
 
-    const getFaviconUrl = (url) => {
-        try {
-            const hasProtocol =
-                url.startsWith("http://") || url.startsWith("https://");
-            const fullUrl = hasProtocol ? url : `http://${url}`;
+    // Adding a new category
+    const [addingCategory, setAddingCategory] = useState(false);
+    const [newCategoryName, setNewCategoryName] = useState("");
 
-            const domain = new URL(fullUrl).hostname;
-            return `https://www.google.com/s2/favicons?domain=${domain}`;
-        } catch (error) {
-            console.error("Invalid URL");
-            return "";
-        }
-    };
-
+    // Dialog states
     const [addDialogVisible, setAddDialogVisible] = useState(false);
+    const [editDialogVisible, setEditDialogVisible] = useState(false);
+
+    // Current category ID for add/edit
     const [currentCategoryId, setCurrentCategoryId] = useState(null);
-    const [bookmarkData, setBookmarkData] = useState({
+
+    // Current link for edit
+    const [currentLink, setCurrentLink] = useState(null);
+
+    // Link form data
+    const [linkData, setLinkData] = useState({
         url: "",
         description: "",
         faviconUrl: "",
     });
 
-    const [editDialogVisible, setEditDialogVisible] = useState(false);
-    const [currentBookmark, setCurrentBookmark] = useState(null);
+    // Update categories/pinned if initialCategories changes
+    useEffect(() => {
+        setCategories(initialCategories || []);
+    }, [initialCategories]);
 
+    useEffect(() => {
+        setPinnedLinks(
+            categories.flatMap((category) =>
+                category.bookmarks.filter((link) => link.pinned)
+            )
+        );
+    }, [categories]);
+
+    // Utility to get favicon URL
+    const getFaviconUrl = (url) => {
+        try {
+            const hasProtocol =
+                url.startsWith("http://") || url.startsWith("https://");
+            const fullUrl = hasProtocol ? url : `http://${url}`;
+            const domain = new URL(fullUrl).hostname;
+            return `https://www.google.com/s2/favicons?domain=${domain}`;
+        } catch (error) {
+            console.error("Invalid URL", error);
+            return "";
+        }
+    };
+
+    // Start inline editing category
+    const startEditingCategory = (category) => {
+        setEditingCategoryId(category.id);
+        setEditingCategoryName(category.name);
+    };
+
+    // Save edited category name
     const saveCategoryName = (categoryId) => {
         router.put(
             `/categories/${categoryId}`,
             { name: editingCategoryName },
             {
                 onSuccess: () => {
-                    // Update the categories array with the new name
                     setCategories((prev) =>
                         prev.map((cat) =>
                             cat.id === categoryId
@@ -77,40 +99,42 @@ const Dashboard = () => {
                     );
                     setEditingCategoryId(null);
                     setEditingCategoryName("");
-                    if (toast.current) {
-                        toast.current.show({
-                            severity: "success",
-                            summary: "Success",
-                            detail: "Category updated successfully.",
-                            life: 3000,
-                        });
-                    }
+                    toast.current?.show({
+                        severity: "success",
+                        summary: "Success",
+                        detail: "Category updated successfully.",
+                        life: 3000,
+                    });
                 },
                 onError: (errors) => {
                     console.error(errors);
-                    if (toast.current) {
-                        toast.current.show({
-                            severity: "error",
-                            summary: "Error",
-                            detail: "Failed to update category name.",
-                            life: 3000,
-                        });
-                    }
+                    toast.current?.show({
+                        severity: "error",
+                        summary: "Error",
+                        detail: "Failed to update category name.",
+                        life: 3000,
+                    });
                 },
             }
         );
     };
 
+    // Open Add Link dialog
+    const openAddDialog = (categoryId) => {
+        setCurrentCategoryId(categoryId);
+        setLinkData({ url: "", description: "", faviconUrl: "" });
+        setAddDialogVisible(true);
+    };
+
+    // Add new category
     const addCategory = () => {
         if (!newCategoryName.trim()) {
-            if (toast.current) {
-                toast.current.show({
-                    severity: "error",
-                    summary: "Error",
-                    detail: "Category name cannot be empty.",
-                    life: 3000,
-                });
-            }
+            toast.current?.show({
+                severity: "error",
+                summary: "Error",
+                detail: "Category name cannot be empty.",
+                life: 3000,
+            });
             return;
         }
 
@@ -119,120 +143,24 @@ const Dashboard = () => {
             { name: newCategoryName },
             {
                 onSuccess: () => {
-                    // Reload categories or update state if you prefer to do so via response
                     router.reload({ only: ["categories"] });
                     setNewCategoryName("");
                     setAddingCategory(false);
                 },
                 onError: (errors) => {
                     console.error(errors);
-                    if (toast.current) {
-                        toast.current.show({
-                            severity: "error",
-                            summary: "Error",
-                            detail: "Failed to create category.",
-                            life: 3000,
-                        });
-                    }
-                },
-            }
-        );
-    };
-
-    const openAddDialog = (categoryId) => {
-        setCurrentCategoryId(categoryId);
-        setBookmarkData({ url: "", description: "", faviconUrl: "" });
-        setAddDialogVisible(true);
-    };
-
-    useEffect(() => {
-        setCategories(initialCategories || []);
-    }, [initialCategories]);
-
-    useEffect(() => {
-        setPinnedBookmarks(
-            categories.flatMap((category) =>
-                category.bookmarks.filter((bookmark) => bookmark.pinned)
-            )
-        );
-    }, [categories]);
-
-    const addBookmark = () => {
-        if (
-            !bookmarkData.url.startsWith("http://") &&
-            !bookmarkData.url.startsWith("https://")
-        ) {
-            bookmarkData.url = "https://" + bookmarkData.url;
-        }
-
-        try {
-            const urlObject = new URL(bookmarkData.url);
-            if (!urlObject.hostname.includes(".")) {
-                toast.current.show({
-                    severity: "error",
-                    summary: "Error",
-                    detail: "Please enter a valid URL.",
-                    life: 3000,
-                });
-                return;
-            }
-        } catch (error) {
-            toast.current.show({
-                severity: "error",
-                summary: "Error",
-                detail: "Please enter a valid URL.",
-                life: 3000,
-            });
-            return;
-        }
-
-        const faviconUrl = getFaviconUrl(bookmarkData.url);
-
-        router.post(
-            "/bookmarks",
-            {
-                category_id: currentCategoryId,
-                url: bookmarkData.url,
-                description: bookmarkData.description,
-                favicon_url: faviconUrl,
-            },
-            {
-                onSuccess: () => {
-                    router.reload({ only: ["categories"] });
-                    setAddDialogVisible(false);
-                    setBookmarkData({
-                        url: "",
-                        description: "",
-                        faviconUrl: "",
+                    toast.current?.show({
+                        severity: "error",
+                        summary: "Error",
+                        detail: "Failed to create category.",
+                        life: 3000,
                     });
-                    setCurrentCategoryId(null);
-                },
-                onError: (errors) => {
-                    console.error("Error updating bookmark:", errors);
-                    if (toast.current) {
-                        toast.current.show({
-                            severity: "error",
-                            summary: "Error",
-                            detail: "Failed to update bookmark.",
-                            life: 3000,
-                        });
-                    }
                 },
             }
         );
     };
 
-    const openEditDialog = (bookmark, categoryId) => {
-        setCurrentCategoryId(categoryId);
-        setCurrentBookmark(bookmark);
-        setBookmarkData({
-            url: bookmark.url,
-            description: bookmark.description,
-            faviconUrl: bookmark.faviconUrl,
-        });
-        setEditDialogVisible(true);
-    };
-
+    // Delete category
     const deleteCategory = (categoryId) => {
         confirmDialog({
             message: "Are you sure you want to delete this category?",
@@ -243,48 +171,44 @@ const Dashboard = () => {
             accept: () => {
                 router.delete(`/categories/${categoryId}`, {
                     onSuccess: () => {
-                        setCategories((prevCategories) =>
-                            prevCategories.filter(
-                                (cat) => cat.id !== categoryId
-                            )
+                        setCategories((prev) =>
+                            prev.filter((cat) => cat.id !== categoryId)
                         );
-                        if (toast.current) {
-                            toast.current.show({
-                                severity: "success",
-                                summary: "Success",
-                                detail: "Category deleted successfully.",
-                                life: 3000,
-                            });
-                        }
+                        toast.current?.show({
+                            severity: "success",
+                            summary: "Success",
+                            detail: "Category deleted successfully.",
+                            life: 3000,
+                        });
                     },
                     onError: (errors) => {
                         console.error(errors);
-                        if (toast.current) {
-                            toast.current.show({
-                                severity: "error",
-                                summary: "Error",
-                                detail: "Failed to delete category.",
-                                life: 3000,
-                            });
-                        }
+                        toast.current?.show({
+                            severity: "error",
+                            summary: "Error",
+                            detail: "Failed to delete category.",
+                            life: 3000,
+                        });
                     },
                 });
             },
         });
     };
 
-    const saveBookmarkChanges = () => {
+    // Add link
+    const addLink = () => {
         if (
-            !bookmarkData.url.startsWith("http://") &&
-            !bookmarkData.url.startsWith("https://")
+            !linkData.url.startsWith("http://") &&
+            !linkData.url.startsWith("https://")
         ) {
-            bookmarkData.url = "https://" + bookmarkData.url;
+            linkData.url = "https://" + linkData.url;
         }
 
+        // Validate URL
         try {
-            const urlObject = new URL(bookmarkData.url);
+            const urlObject = new URL(linkData.url);
             if (!urlObject.hostname.includes(".")) {
-                toast.current.show({
+                toast.current?.show({
                     severity: "error",
                     summary: "Error",
                     detail: "Please enter a valid URL.",
@@ -293,7 +217,7 @@ const Dashboard = () => {
                 return;
             }
         } catch (error) {
-            toast.current.show({
+            toast.current?.show({
                 severity: "error",
                 summary: "Error",
                 detail: "Please enter a valid URL.",
@@ -302,60 +226,124 @@ const Dashboard = () => {
             return;
         }
 
-        const faviconUrl = getFaviconUrl(bookmarkData.url);
+        const faviconUrl = getFaviconUrl(linkData.url);
 
-        router.put(
-            `/bookmarks/${currentBookmark.id}`,
+        router.post(
+            "/bookmarks",
             {
-                url: bookmarkData.url,
-                description: bookmarkData.description,
+                category_id: currentCategoryId,
+                url: linkData.url,
+                description: linkData.description,
                 favicon_url: faviconUrl,
-                pinned: currentBookmark.pinned,
             },
             {
                 onSuccess: () => {
-                    setEditDialogVisible(false);
-                    setBookmarkData({
-                        url: "",
-                        description: "",
-                        faviconUrl: "",
-                    });
-                    setCurrentBookmark(null);
+                    router.reload({ only: ["categories"] });
+                    setAddDialogVisible(false);
+                    setLinkData({ url: "", description: "", faviconUrl: "" });
                     setCurrentCategoryId(null);
-
-                    if (toast.current) {
-                        toast.current.show({
-                            severity: "success",
-                            summary: "Success",
-                            detail: "Bookmark updated successfully.",
-                            life: 3000,
-                        });
-                    }
                 },
                 onError: (errors) => {
-                    console.error("Error updating bookmark:", errors);
-                    if (toast.current) {
-                        toast.current.show({
-                            severity: "error",
-                            summary: "Error",
-                            detail: "Failed to update bookmark.",
-                            life: 3000,
-                        });
-                    }
+                    console.error("Error updating link:", errors);
+                    toast.current?.show({
+                        severity: "error",
+                        summary: "Error",
+                        detail: "Failed to update link.",
+                        life: 3000,
+                    });
                 },
             }
         );
     };
 
-    const deleteBookmark = (bookmarkId, categoryId) => {
+    // Open Edit Link dialog
+    const openEditDialog = (link, categoryId) => {
+        setCurrentCategoryId(categoryId);
+        setCurrentLink(link);
+        setLinkData({
+            url: link.url,
+            description: link.description,
+            faviconUrl: link.faviconUrl,
+        });
+        setEditDialogVisible(true);
+    };
+
+    // Save changes to a link
+    const saveLinkChanges = () => {
+        if (
+            !linkData.url.startsWith("http://") &&
+            !linkData.url.startsWith("https://")
+        ) {
+            linkData.url = "https://" + linkData.url;
+        }
+
+        try {
+            const urlObject = new URL(linkData.url);
+            if (!urlObject.hostname.includes(".")) {
+                toast.current?.show({
+                    severity: "error",
+                    summary: "Error",
+                    detail: "Please enter a valid URL.",
+                    life: 3000,
+                });
+                return;
+            }
+        } catch (error) {
+            toast.current?.show({
+                severity: "error",
+                summary: "Error",
+                detail: "Please enter a valid URL.",
+                life: 3000,
+            });
+            return;
+        }
+
+        const faviconUrl = getFaviconUrl(linkData.url);
+
+        router.put(
+            `/bookmarks/${currentLink.id}`,
+            {
+                url: linkData.url,
+                description: linkData.description,
+                favicon_url: faviconUrl,
+                pinned: currentLink.pinned,
+            },
+            {
+                onSuccess: () => {
+                    setEditDialogVisible(false);
+                    setLinkData({ url: "", description: "", faviconUrl: "" });
+                    setCurrentLink(null);
+                    setCurrentCategoryId(null);
+                    toast.current?.show({
+                        severity: "success",
+                        summary: "Success",
+                        detail: "Link updated successfully.",
+                        life: 3000,
+                    });
+                },
+                onError: (errors) => {
+                    console.error("Error updating link:", errors);
+                    toast.current?.show({
+                        severity: "error",
+                        summary: "Error",
+                        detail: "Failed to update link.",
+                        life: 3000,
+                    });
+                },
+            }
+        );
+    };
+
+    // Delete link
+    const deleteLink = (linkId, categoryId) => {
         confirmDialog({
-            message: "Are you sure you want to delete this bookmark?",
+            message: "Are you sure you want to delete this link?",
             header: "Confirmation",
             icon: "pi pi-exclamation-triangle",
             acceptLabel: "Yes",
             rejectLabel: "No",
             accept: () => {
-                router.delete(`/bookmarks/${bookmarkId}`, {
+                router.delete(`/bookmarks/${linkId}`, {
                     onSuccess: () => {
                         setCategories((prevCategories) =>
                             prevCategories.map((category) => {
@@ -363,20 +351,22 @@ const Dashboard = () => {
                                     return {
                                         ...category,
                                         bookmarks: category.bookmarks.filter(
-                                            (bookmark) =>
-                                                bookmark.id !== bookmarkId
+                                            (link) => link.id !== linkId
                                         ),
                                     };
-                                } else {
-                                    return category;
                                 }
+                                return category;
                             })
                         );
-                        setPinnedBookmarks((prevPinned) =>
-                            prevPinned.filter(
-                                (bookmark) => bookmark.id !== bookmarkId
-                            )
+                        setPinnedLinks((prevPinned) =>
+                            prevPinned.filter((b) => b.id !== linkId)
                         );
+                        toast.current?.show({
+                            severity: "success",
+                            summary: "Success",
+                            detail: "Link deleted successfully.",
+                            life: 3000,
+                        });
                     },
                     onError: (errors) => {
                         console.error(errors);
@@ -386,11 +376,11 @@ const Dashboard = () => {
         });
     };
 
-    const togglePinBookmark = (bookmark, categoryId) => {
-        const newPinnedStatus = !bookmark.pinned;
-
+    // Pin/unpin link
+    const togglePinLink = (link, categoryId) => {
+        const newPinnedStatus = !link.pinned;
         router.put(
-            `/bookmarks/${bookmark.id}`,
+            `/bookmarks/${link.id}`,
             {
                 pinned: newPinnedStatus,
             },
@@ -402,25 +392,23 @@ const Dashboard = () => {
                                 return {
                                     ...category,
                                     bookmarks: category.bookmarks.map((b) =>
-                                        b.id === bookmark.id
+                                        b.id === link.id
                                             ? { ...b, pinned: newPinnedStatus }
                                             : b
                                     ),
                                 };
-                            } else {
-                                return category;
                             }
+                            return category;
                         })
                     );
-
                     if (newPinnedStatus) {
-                        setPinnedBookmarks((prevPinned) => [
+                        setPinnedLinks((prevPinned) => [
                             ...prevPinned,
-                            { ...bookmark, pinned: true },
+                            { ...link, pinned: true },
                         ]);
                     } else {
-                        setPinnedBookmarks((prevPinned) =>
-                            prevPinned.filter((b) => b.id !== bookmark.id)
+                        setPinnedLinks((prevPinned) =>
+                            prevPinned.filter((b) => b.id !== link.id)
                         );
                     }
                 },
@@ -431,7 +419,7 @@ const Dashboard = () => {
         );
     };
 
-    // Helper function to reorder an array
+    // Reordering helper
     const reorder = (list, startIndex, endIndex) => {
         const result = Array.from(list);
         const [removed] = result.splice(startIndex, 1);
@@ -439,13 +427,13 @@ const Dashboard = () => {
         return result;
     };
 
+    // On drag end
     const onDragEnd = (result) => {
         if (!result.destination) return;
-
         const { source, destination, type } = result;
 
         if (type === "category") {
-            // Reorder categories in local state
+            // Reorder categories
             const newCategories = reorder(
                 categories,
                 source.index,
@@ -453,61 +441,50 @@ const Dashboard = () => {
             );
             setCategories(newCategories);
 
-            // Prepare data for the backend
+            // Update order in backend
             const reorderData = newCategories.map((cat, idx) => ({
                 id: cat.id,
-                order: idx, // or idx + 1, depending on how you count
+                order: idx,
             }));
-
-            // Send updated order to the backend
             router.put(
                 "/categories/reorder",
                 { categories: reorderData },
                 {
                     onSuccess: () => {
                         console.log("Categories reordered successfully");
-                        // Optionally show a toast if needed:
-                        // toast.current.show({ severity: 'success', summary: 'Success', detail: 'Categories order updated.', life: 3000 });
                     },
                     onError: (errors) => {
                         console.error("Error reordering categories:", errors);
-                        // Optionally show a toast:
-                        // toast.current.show({ severity: 'error', summary: 'Error', detail: 'Failed to reorder categories.', life: 3000 });
                     },
                 }
             );
-
             return;
         }
 
         if (type === "bookmark") {
-            // Handle bookmarks (either pinned or within categories)
+            // Reorder pinned => pinned
             if (
                 source.droppableId === "pinned" &&
                 destination.droppableId === "pinned"
             ) {
-                // Reordering pinned bookmarks
                 const newPinned = reorder(
-                    pinnedBookmarks,
+                    pinnedLinks,
                     source.index,
                     destination.index
                 );
-                setPinnedBookmarks(newPinned);
+                setPinnedLinks(newPinned);
                 return;
             }
 
-            // It's a bookmark in a category
             const sourceCategory = categories.find(
                 (category) => category.id.toString() === source.droppableId
             );
             const destCategory = categories.find(
                 (category) => category.id.toString() === destination.droppableId
             );
-
             if (!sourceCategory || !destCategory) return;
 
             const movingItem = sourceCategory.bookmarks[source.index];
-
             const newSourceBookmarks = Array.from(sourceCategory.bookmarks);
             newSourceBookmarks.splice(source.index, 1);
 
@@ -528,184 +505,224 @@ const Dashboard = () => {
 
             router.put(
                 `/bookmarks/${movingItem.id}`,
-                {
-                    category_id: destCategory.id,
-                },
+                { category_id: destCategory.id },
                 {
                     onSuccess: () => {
-                        console.log("Bookmark category updated successfully");
+                        console.log("Link category updated successfully");
                     },
                     onError: (errors) => {
-                        console.error(
-                            "Error updating bookmark category:",
-                            errors
-                        );
+                        console.error("Error updating link category:", errors);
                     },
                 }
             );
         }
     };
 
+    // 3-dots menu
+    const LinkOptions = ({ link, categoryId }) => {
+        const menuRef = useRef(null);
+
+        const items = [
+            {
+                label: "Edit",
+                icon: "pi pi-pencil",
+                command: () => openEditDialog(link, categoryId),
+            },
+            {
+                label: link.pinned ? "Unpin" : "Pin",
+                icon: link.pinned ? "pi pi-bookmark-fill" : "pi pi-bookmark",
+                command: () => togglePinLink(link, categoryId),
+            },
+            {
+                label: "Delete",
+                icon: "pi pi-trash",
+                command: () => deleteLink(link.id, categoryId),
+            },
+        ];
+
+        // We stop propagation on the 3-dot button so clicks won't open the link
+        const onMenuButtonClick = (e) => {
+            e.stopPropagation();
+            menuRef.current?.toggle(e);
+        };
+
+        return (
+            <>
+                <Menu model={items} popup ref={menuRef} />
+                <Button
+                    icon="pi pi-ellipsis-v"
+                    className="p-button-text"
+                    onClick={onMenuButtonClick}
+                />
+            </>
+        );
+    };
+
+    // Helper to open link in new tab
+    const openLink = (url) => {
+        // Validate: if user doesn't want a new tab, you could do window.location = ...
+        // But usually new tab is best
+        window.open(url, "_blank");
+    };
+
     return (
         <Layout>
             <Toast ref={toast} />
-            <div className="grid">
-                <ConfirmDialog />
+            <ConfirmDialog />
 
-                {pinnedBookmarks.length > 0 && (
-                    <div className="col-12">
-                        <div className="card">
-                            <h5>Pinned Bookmarks</h5>
-                            <DragDropContext onDragEnd={onDragEnd}>
-                                <Droppable
-                                    droppableId="pinned"
-                                    direction="horizontal"
-                                    type="bookmark"
+            {/* Pinned Links */}
+            {pinnedLinks.length > 0 && (
+                <div className="col-12">
+                    <div className="card">
+                        <h5>Pinned Links</h5>
+                        <DragDropContext onDragEnd={onDragEnd}>
+                            <Droppable
+                                droppableId="pinned"
+                                direction="horizontal"
+                                type="bookmark"
+                            >
+                                {(provided) => (
+                                    <div
+                                        className="flex flex-wrap"
+                                        ref={provided.innerRef}
+                                        {...provided.droppableProps}
+                                    >
+                                        {pinnedLinks.map((link, index) => (
+                                            <Draggable
+                                                key={link.id}
+                                                draggableId={link.id.toString()}
+                                                index={index}
+                                                type="bookmark"
+                                            >
+                                                {(provided, snapshot) => (
+                                                    <div
+                                                        className={`p-2 m-1 border-round flex-none w-48 ${
+                                                            snapshot.isDragging
+                                                                ? "surface-200"
+                                                                : "surface-100"
+                                                        }`}
+                                                        ref={provided.innerRef}
+                                                        {...provided.draggableProps}
+                                                        // Entire container is clickable
+                                                        onClick={() =>
+                                                            openLink(link.url)
+                                                        }
+                                                    >
+                                                        <div className="flex align-items-center justify-content-between">
+                                                            {/* 
+                                                              Left side: Drag handle + icon + link text 
+                                                              NOTE: We stopPropagation() on the handle 
+                                                            */}
+                                                            <div
+                                                                className="flex align-items-center"
+                                                                {...provided.dragHandleProps}
+                                                                onClick={(e) =>
+                                                                    e.stopPropagation()
+                                                                }
+                                                            >
+                                                                {/* Drag handle icon */}
+                                                                <i className="pi pi-arrows mr-2 cursor-move" />
+                                                                {/* Favicon */}
+                                                                {link.favicon_url && (
+                                                                    <img
+                                                                        src={
+                                                                            link.favicon_url
+                                                                        }
+                                                                        alt="favicon"
+                                                                        onError={(
+                                                                            e
+                                                                        ) => {
+                                                                            e.target.onerror =
+                                                                                null;
+                                                                            e.target.style.display =
+                                                                                "none";
+                                                                        }}
+                                                                        style={{
+                                                                            width: "24px",
+                                                                            height: "24px",
+                                                                            marginRight:
+                                                                                "8px",
+                                                                        }}
+                                                                    />
+                                                                )}
+                                                                {/* Show link text or description */}
+                                                                <span>
+                                                                    {link.description ||
+                                                                        link.url}
+                                                                </span>
+                                                            </div>
+                                                            {/* Right side: 3-dots menu */}
+                                                            <div
+                                                                onClick={(e) =>
+                                                                    e.stopPropagation()
+                                                                }
+                                                            >
+                                                                <LinkOptions
+                                                                    link={link}
+                                                                    categoryId={
+                                                                        link.categoryId ||
+                                                                        ""
+                                                                    }
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </Draggable>
+                                        ))}
+                                        {provided.placeholder}
+                                    </div>
+                                )}
+                            </Droppable>
+                        </DragDropContext>
+                    </div>
+                </div>
+            )}
+
+            {/* Categories */}
+            <DragDropContext onDragEnd={onDragEnd}>
+                <Droppable
+                    droppableId="categories"
+                    type="category"
+                    direction="horizontal"
+                >
+                    {(provided) => (
+                        <div
+                            ref={provided.innerRef}
+                            {...provided.droppableProps}
+                            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-4"
+                            style={{ minHeight: "300px" }}
+                        >
+                            {categories.map((category, categoryIndex) => (
+                                <Draggable
+                                    key={category.id}
+                                    draggableId={`category-${category.id}`}
+                                    index={categoryIndex}
+                                    type="category"
                                 >
                                     {(provided) => (
                                         <div
-                                            className="flex flex-wrap"
                                             ref={provided.innerRef}
-                                            {...provided.droppableProps}
+                                            {...provided.draggableProps}
+                                            style={{ minWidth: "31%" }}
                                         >
-                                            {pinnedBookmarks.map(
-                                                (bookmark, index) => (
-                                                    <Draggable
-                                                        key={bookmark.id}
-                                                        draggableId={bookmark.id.toString()}
-                                                        index={index}
-                                                        type="bookmark"
-                                                    >
-                                                        {(
-                                                            provided,
-                                                            snapshot
-                                                        ) => (
-                                                            <div
-                                                                className={`p-2 m-1 border-round flex-none w-48 ${
-                                                                    snapshot.isDragging
-                                                                        ? "surface-200"
-                                                                        : "surface-100"
-                                                                }`}
-                                                                ref={
-                                                                    provided.innerRef
-                                                                }
-                                                                {...provided.draggableProps}
-                                                                {...provided.dragHandleProps}
-                                                            >
-                                                                <div className="flex align-items-center">
-                                                                    {bookmark.favicon_url && (
-                                                                        <img
-                                                                            src={
-                                                                                bookmark.favicon_url
-                                                                            }
-                                                                            alt="favicon"
-                                                                            onError={(
-                                                                                e
-                                                                            ) => {
-                                                                                e.target.onerror =
-                                                                                    null;
-                                                                                e.target.style.display =
-                                                                                    "none";
-                                                                            }}
-                                                                            style={{
-                                                                                width: "16px",
-                                                                                height: "16px",
-                                                                                marginRight:
-                                                                                    "8px",
-                                                                            }}
-                                                                        />
-                                                                    )}
-                                                                    <a
-                                                                        href={
-                                                                            bookmark.url.startsWith(
-                                                                                "http://"
-                                                                            ) ||
-                                                                            bookmark.url.startsWith(
-                                                                                "https://"
-                                                                            )
-                                                                                ? bookmark.url
-                                                                                : `http://${bookmark.url}`
-                                                                        }
-                                                                        target="_blank"
-                                                                        rel="noopener noreferrer"
-                                                                        className="text-primary hover:underline"
-                                                                    >
-                                                                        {bookmark.description ||
-                                                                            bookmark.url}
-                                                                    </a>
-                                                                    <Button
-                                                                        icon="pi pi-times"
-                                                                        className="p-button-text p-button-sm p-button-rounded p-button-danger ml-2"
-                                                                        onClick={() =>
-                                                                            togglePinBookmark(
-                                                                                bookmark,
-                                                                                categories.find(
-                                                                                    (
-                                                                                        cat
-                                                                                    ) =>
-                                                                                        cat.bookmarks.some(
-                                                                                            (
-                                                                                                b
-                                                                                            ) =>
-                                                                                                b.id ===
-                                                                                                bookmark.id
-                                                                                        )
-                                                                                )
-                                                                                    ?.id
-                                                                            )
-                                                                        }
-                                                                        tooltip="Unpin Bookmark"
-                                                                    />
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                    </Draggable>
-                                                )
-                                            )}
-                                            {provided.placeholder}
-                                        </div>
-                                    )}
-                                </Droppable>
-                            </DragDropContext>
-                        </div>
-                    </div>
-                )}
-
-                {/* 
-                  NEW: Wrap categories in a Droppable with type="category"
-                  This will allow us to reorder categories themselves.
-                */}
-                <DragDropContext onDragEnd={onDragEnd}>
-                    <Droppable
-                        droppableId="categories"
-                        type="category"
-                        direction="horizontal"
-                    >
-                        {(provided) => (
-                            <div
-                                ref={provided.innerRef}
-                                {...provided.droppableProps}
-                                className="grid"
-                            >
-                                {categories.map((category, categoryIndex) => (
-                                    <Draggable
-                                        key={category.id}
-                                        draggableId={`category-${category.id}`}
-                                        index={categoryIndex}
-                                        type="category"
-                                    >
-                                        {(provided) => (
-                                            <div
-                                                className="bookmarks-list col-12 md:col-6 lg:col-4"
-                                                ref={provided.innerRef}
-                                                {...provided.draggableProps}
-                                            >
-                                                <div className="card">
-                                                    {/* Use dragHandleProps on a drag handle - for example, the header */}
+                                            <div className="card p-4">
+                                                {/* 
+                                                  Category header: drag handle + category name + plus button
+                                                  We'll move the drag handle to an icon 
+                                                */}
+                                                <div className="flex justify-content-between align-items-center mb-2">
                                                     <div
-                                                        className="flex justify-content-between align-items-center"
+                                                        className="flex align-items-center"
+                                                        // drag handle
                                                         {...provided.dragHandleProps}
+                                                        // don't open anything if user clicks handle
+                                                        onClick={(e) =>
+                                                            e.stopPropagation()
+                                                        }
                                                     >
+                                                        <i className="pi pi-arrows mr-2 cursor-move" />
+                                                        {/* Category name editing */}
                                                         {editingCategoryId ===
                                                         category.id ? (
                                                             <InputText
@@ -725,15 +742,13 @@ const Dashboard = () => {
                                                                 }
                                                                 onKeyDown={(
                                                                     e
-                                                                ) => {
-                                                                    if (
-                                                                        e.key ===
-                                                                        "Enter"
+                                                                ) =>
+                                                                    e.key ===
+                                                                        "Enter" &&
+                                                                    saveCategoryName(
+                                                                        category.id
                                                                     )
-                                                                        saveCategoryName(
-                                                                            category.id
-                                                                        );
-                                                                }}
+                                                                }
                                                                 autoFocus
                                                             />
                                                         ) : (
@@ -747,369 +762,323 @@ const Dashboard = () => {
                                                                 {category.name}
                                                             </h5>
                                                         )}
-                                                        <Button
-                                                            icon="pi pi-plus"
-                                                            className="p-button-rounded p-button-text"
-                                                            onClick={() =>
-                                                                openAddDialog(
-                                                                    category.id
-                                                                )
-                                                            }
-                                                            tooltip="Add Bookmark"
-                                                            tooltipOptions={{
-                                                                position: "top",
-                                                            }}
-                                                        />
                                                     </div>
-
-                                                    {/* The droppable for bookmarks within this category */}
-                                                    <Droppable
-                                                        droppableId={category.id.toString()}
-                                                        type="bookmark"
-                                                    >
-                                                        {(
-                                                            provided,
-                                                            snapshot
-                                                        ) => (
-                                                            <div
-                                                                ref={
-                                                                    provided.innerRef
-                                                                }
-                                                                {...provided.droppableProps}
-                                                                className={`min-h-20 ${
-                                                                    snapshot.isDraggingOver
-                                                                        ? "border-primary border-dashed"
-                                                                        : ""
-                                                                }`}
-                                                            >
-                                                                {category
-                                                                    .bookmarks
-                                                                    .length ===
-                                                                0 ? (
-                                                                    <div>
-                                                                        <p>
-                                                                            No
-                                                                            bookmarks
-                                                                            yet.
-                                                                            Add
-                                                                            one!
-                                                                        </p>
-                                                                        <div
-                                                                            style={{
-                                                                                marginTop:
-                                                                                    "1rem",
-                                                                            }}
-                                                                        >
-                                                                            <Button
-                                                                                label="Delete Category"
-                                                                                icon="pi pi-trash"
-                                                                                className="p-button-danger p-button-text"
-                                                                                onClick={() =>
-                                                                                    deleteCategory(
-                                                                                        category.id
-                                                                                    )
-                                                                                }
-                                                                            />
-                                                                        </div>
-                                                                    </div>
-                                                                ) : (
-                                                                    <ul className="list-none p-0 m-0">
-                                                                        {category.bookmarks.map(
-                                                                            (
-                                                                                bookmark,
-                                                                                index
-                                                                            ) => (
-                                                                                <Draggable
-                                                                                    key={
-                                                                                        bookmark.id
-                                                                                    }
-                                                                                    draggableId={bookmark.id.toString()}
-                                                                                    index={
-                                                                                        index
-                                                                                    }
-                                                                                    type="bookmark"
-                                                                                >
-                                                                                    {(
-                                                                                        provided,
-                                                                                        snapshot
-                                                                                    ) => (
-                                                                                        <li
-                                                                                            className={`list-none mb-2 p-2 border-round ${
-                                                                                                snapshot.isDragging
-                                                                                                    ? "surface-200"
-                                                                                                    : "surface-100"
-                                                                                            }`}
-                                                                                            ref={
-                                                                                                provided.innerRef
-                                                                                            }
-                                                                                            {...provided.draggableProps}
-                                                                                            {...provided.dragHandleProps}
-                                                                                        >
-                                                                                            <div className="flex justify-content-between align-items-start">
-                                                                                                <div className="flex">
-                                                                                                    {bookmark.favicon_url && (
-                                                                                                        <img
-                                                                                                            src={
-                                                                                                                bookmark.favicon_url
-                                                                                                            }
-                                                                                                            alt="favicon"
-                                                                                                            onError={(
-                                                                                                                e
-                                                                                                            ) => {
-                                                                                                                e.target.onerror =
-                                                                                                                    null;
-                                                                                                                e.target.style.display =
-                                                                                                                    "none";
-                                                                                                            }}
-                                                                                                            style={{
-                                                                                                                width: "16px",
-                                                                                                                height: "16px",
-                                                                                                                marginRight:
-                                                                                                                    "8px",
-                                                                                                            }}
-                                                                                                        />
-                                                                                                    )}
-                                                                                                    <div>
-                                                                                                        <a
-                                                                                                            href={
-                                                                                                                bookmark.url.startsWith(
-                                                                                                                    "http://"
-                                                                                                                ) ||
-                                                                                                                bookmark.url.startsWith(
-                                                                                                                    "https://"
-                                                                                                                )
-                                                                                                                    ? bookmark.url
-                                                                                                                    : `http://${bookmark.url}`
-                                                                                                            }
-                                                                                                            target="_blank"
-                                                                                                            rel="noopener noreferrer"
-                                                                                                            className="text-primary hover:underline"
-                                                                                                        >
-                                                                                                            {bookmark.description ||
-                                                                                                                bookmark.url}
-                                                                                                        </a>
-                                                                                                    </div>
-                                                                                                </div>
-                                                                                                <div className="flex">
-                                                                                                    <Button
-                                                                                                        icon={
-                                                                                                            bookmark.pinned
-                                                                                                                ? "pi pi-bookmark-fill"
-                                                                                                                : "pi pi-bookmark"
-                                                                                                        }
-                                                                                                        className={`p-button-text p-button-sm p-button-rounded ${
-                                                                                                            bookmark.pinned
-                                                                                                                ? "text-warning"
-                                                                                                                : ""
-                                                                                                        }`}
-                                                                                                        onClick={() =>
-                                                                                                            togglePinBookmark(
-                                                                                                                bookmark,
-                                                                                                                category.id
-                                                                                                            )
-                                                                                                        }
-                                                                                                        tooltip={
-                                                                                                            bookmark.pinned
-                                                                                                                ? "Unpin Bookmark"
-                                                                                                                : "Pin Bookmark"
-                                                                                                        }
-                                                                                                        tooltipOptions={{
-                                                                                                            position:
-                                                                                                                "top",
-                                                                                                        }}
-                                                                                                    />
-                                                                                                    <Button
-                                                                                                        icon="pi pi-pencil"
-                                                                                                        className="p-button-text p-button-sm p-button-rounded"
-                                                                                                        onClick={() =>
-                                                                                                            openEditDialog(
-                                                                                                                bookmark,
-                                                                                                                category.id
-                                                                                                            )
-                                                                                                        }
-                                                                                                        tooltip="Edit Bookmark"
-                                                                                                        tooltipOptions={{
-                                                                                                            position:
-                                                                                                                "top",
-                                                                                                        }}
-                                                                                                    />
-                                                                                                    <Button
-                                                                                                        icon="pi pi-trash"
-                                                                                                        className="p-button-text p-button-sm p-button-rounded p-button-danger"
-                                                                                                        onClick={() =>
-                                                                                                            deleteBookmark(
-                                                                                                                bookmark.id,
-                                                                                                                category.id
-                                                                                                            )
-                                                                                                        }
-                                                                                                        tooltip="Delete Bookmark"
-                                                                                                        tooltipOptions={{
-                                                                                                            position:
-                                                                                                                "top",
-                                                                                                        }}
-                                                                                                    />
-                                                                                                </div>
-                                                                                            </div>
-                                                                                        </li>
-                                                                                    )}
-                                                                                </Draggable>
-                                                                            )
-                                                                        )}
-                                                                    </ul>
-                                                                )}
-                                                                {
-                                                                    provided.placeholder
-                                                                }
-                                                            </div>
-                                                        )}
-                                                    </Droppable>
+                                                    {/* Add Link button */}
+                                                    <Button
+                                                        icon="pi pi-plus"
+                                                        className="p-button-rounded p-button-text"
+                                                        onClick={() =>
+                                                            openAddDialog(
+                                                                category.id
+                                                            )
+                                                        }
+                                                        tooltip="Add Link"
+                                                        tooltipOptions={{
+                                                            position: "top",
+                                                        }}
+                                                    />
                                                 </div>
+
+                                                {/* Links within the category */}
+                                                <Droppable
+                                                    droppableId={category.id.toString()}
+                                                    type="bookmark"
+                                                >
+                                                    {(provided, snapshot) => (
+                                                        <div
+                                                            ref={
+                                                                provided.innerRef
+                                                            }
+                                                            {...provided.droppableProps}
+                                                            className={`min-h-20 p-2 rounded ${
+                                                                snapshot.isDraggingOver
+                                                                    ? "border-2 border-dashed border-blue-500"
+                                                                    : "border-2 border-dashed border-transparent"
+                                                            }`}
+                                                        >
+                                                            {category.bookmarks
+                                                                .length ===
+                                                            0 ? (
+                                                                <div>
+                                                                    <p>
+                                                                        No links
+                                                                        yet. Add
+                                                                        one!
+                                                                    </p>
+                                                                    <div className="mt-2">
+                                                                        <Button
+                                                                            label="Delete Category"
+                                                                            icon="pi pi-trash"
+                                                                            className="p-button-danger p-button-text"
+                                                                            onClick={() =>
+                                                                                deleteCategory(
+                                                                                    category.id
+                                                                                )
+                                                                            }
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                            ) : (
+                                                                <ul className="list-none p-0 m-0">
+                                                                    {category.bookmarks.map(
+                                                                        (
+                                                                            link,
+                                                                            idx
+                                                                        ) => (
+                                                                            <Draggable
+                                                                                key={
+                                                                                    link.id
+                                                                                }
+                                                                                draggableId={link.id.toString()}
+                                                                                index={
+                                                                                    idx
+                                                                                }
+                                                                                type="bookmark"
+                                                                            >
+                                                                                {(
+                                                                                    provided,
+                                                                                    snapshot
+                                                                                ) => (
+                                                                                    <li
+                                                                                        ref={
+                                                                                            provided.innerRef
+                                                                                        }
+                                                                                        {...provided.draggableProps}
+                                                                                        // Entire <li> is clickable
+                                                                                        onClick={() =>
+                                                                                            openLink(
+                                                                                                link.url
+                                                                                            )
+                                                                                        }
+                                                                                        style={{
+                                                                                            ...provided
+                                                                                                .draggableProps
+                                                                                                .style,
+                                                                                            borderRadius:
+                                                                                                "8px",
+                                                                                            background:
+                                                                                                snapshot.isDragging
+                                                                                                    ? "#fddbdc" // or any highlight color
+                                                                                                    : "#8383830d",
+                                                                                            border: "1px solid #80808042",
+                                                                                            marginBottom:
+                                                                                                "0.5rem",
+                                                                                            padding:
+                                                                                                "0.5rem",
+                                                                                        }}
+                                                                                    >
+                                                                                        <div
+                                                                                            className="flex justify-content-between align-items-center  cursor-pointer"
+                                                                                            style={{
+                                                                                                alignItems:
+                                                                                                    "center",
+                                                                                            }}
+                                                                                        >
+                                                                                            {/* Left side: drag handle + favicon + text */}
+                                                                                            <div
+                                                                                                className="flex items-center"
+                                                                                                {...provided.dragHandleProps}
+                                                                                                onClick={(
+                                                                                                    e
+                                                                                                ) =>
+                                                                                                    e.stopPropagation()
+                                                                                                }
+                                                                                            >
+                                                                                                <i className="pi pi-arrows mr-2 cursor-move" />
+                                                                                                {link.favicon_url && (
+                                                                                                    <img
+                                                                                                        src={
+                                                                                                            link.favicon_url
+                                                                                                        }
+                                                                                                        alt="favicon"
+                                                                                                        onError={(
+                                                                                                            e
+                                                                                                        ) => {
+                                                                                                            e.target.onerror =
+                                                                                                                null;
+                                                                                                            e.target.style.display =
+                                                                                                                "none";
+                                                                                                        }}
+                                                                                                        style={{
+                                                                                                            width: "24px",
+                                                                                                            height: "24px",
+                                                                                                            marginRight:
+                                                                                                                "8px",
+                                                                                                        }}
+                                                                                                    />
+                                                                                                )}
+                                                                                            </div>
+                                                                                            <span>
+                                                                                                {link.description ||
+                                                                                                    link.url}
+                                                                                            </span>
+                                                                                            {/* Right side: 3-dots menu */}
+                                                                                            <div
+                                                                                                onClick={(
+                                                                                                    e
+                                                                                                ) =>
+                                                                                                    e.stopPropagation()
+                                                                                                }
+                                                                                            >
+                                                                                                <LinkOptions
+                                                                                                    link={
+                                                                                                        link
+                                                                                                    }
+                                                                                                    categoryId={
+                                                                                                        category.id
+                                                                                                    }
+                                                                                                />
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    </li>
+                                                                                )}
+                                                                            </Draggable>
+                                                                        )
+                                                                    )}
+                                                                </ul>
+                                                            )}
+                                                            {
+                                                                provided.placeholder
+                                                            }
+                                                        </div>
+                                                    )}
+                                                </Droppable>
                                             </div>
-                                        )}
-                                    </Draggable>
-                                ))}
-                                {provided.placeholder}
-                            </div>
-                        )}
-                    </Droppable>
-                    {addingCategory ? (
-                        <div className="col-12" style={{ marginTop: "1rem" }}>
-                            <div className="p-inputgroup">
-                                <InputText
-                                    value={newCategoryName}
-                                    onChange={(e) =>
-                                        setNewCategoryName(e.target.value)
-                                    }
-                                    placeholder="New Category Name"
-                                />
-                                <Button
-                                    label="Save"
-                                    icon="pi pi-check"
-                                    onClick={addCategory}
-                                />
-                                <Button
-                                    label="Cancel"
-                                    icon="pi pi-times"
-                                    className="p-button-secondary"
-                                    onClick={() => setAddingCategory(false)}
-                                />
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="col-12" style={{ marginTop: "1rem" }}>
-                            <Button
-                                label="Add New Category"
-                                icon="pi pi-plus"
-                                onClick={() => setAddingCategory(true)}
-                            />
+                                        </div>
+                                    )}
+                                </Draggable>
+                            ))}
+                            {provided.placeholder}
                         </div>
                     )}
-                </DragDropContext>
+                </Droppable>
 
-                {/* Add Bookmark Dialog */}
-                <Dialog
-                    header="Add Bookmark"
-                    visible={addDialogVisible}
-                    style={{ width: "400px" }}
-                    modal
-                    onHide={() => {
-                        setAddDialogVisible(false);
-                        setBookmarkData({
-                            url: "",
-                            description: "",
-                            faviconUrl: "",
-                        });
-                        setCurrentCategoryId(null);
-                    }}
-                >
-                    <div className="p-fluid">
-                        <div className="field">
-                            <label htmlFor="url">URL</label>
+                {addingCategory ? (
+                    <div className="col-12 mt-4">
+                        <div className="p-inputgroup">
                             <InputText
-                                id="url"
-                                value={bookmarkData.url}
+                                value={newCategoryName}
                                 onChange={(e) =>
-                                    setBookmarkData({
-                                        ...bookmarkData,
-                                        url: e.target.value,
-                                    })
+                                    setNewCategoryName(e.target.value)
                                 }
-                                placeholder="Enter the URL"
+                                placeholder="New Category Name"
+                            />
+                            <Button
+                                label="Save"
+                                icon="pi pi-check"
+                                onClick={addCategory}
+                            />
+                            <Button
+                                label="Cancel"
+                                icon="pi pi-times"
+                                className="p-button-secondary"
+                                onClick={() => setAddingCategory(false)}
                             />
                         </div>
-                        <div className="field">
-                            <label htmlFor="description">Description</label>
-                            <InputTextarea
-                                id="description"
-                                value={bookmarkData.description}
-                                onChange={(e) =>
-                                    setBookmarkData({
-                                        ...bookmarkData,
-                                        description: e.target.value,
-                                    })
-                                }
-                                rows={3}
-                                placeholder="Enter a description"
-                            />
-                        </div>
-                        <Button label="Add Bookmark" onClick={addBookmark} />
                     </div>
-                </Dialog>
-
-                {/* Edit Bookmark Dialog */}
-                <Dialog
-                    header="Edit Bookmark"
-                    visible={editDialogVisible}
-                    style={{ width: "400px" }}
-                    modal
-                    onHide={() => {
-                        setEditDialogVisible(false);
-                        setBookmarkData({
-                            url: "",
-                            description: "",
-                            faviconUrl: "",
-                        });
-                        setCurrentBookmark(null);
-                        setCurrentCategoryId(null);
-                    }}
-                >
-                    <div className="p-fluid">
-                        <div className="field">
-                            <label htmlFor="url">URL</label>
-                            <InputText
-                                id="url"
-                                value={bookmarkData.url}
-                                onChange={(e) =>
-                                    setBookmarkData({
-                                        ...bookmarkData,
-                                        url: e.target.value,
-                                    })
-                                }
-                                placeholder="Enter the URL"
-                            />
-                        </div>
-                        <div className="field">
-                            <label htmlFor="description">Description</label>
-                            <InputTextarea
-                                id="description"
-                                value={bookmarkData.description}
-                                onChange={(e) =>
-                                    setBookmarkData({
-                                        ...bookmarkData,
-                                        description: e.target.value,
-                                    })
-                                }
-                                rows={3}
-                                placeholder="Enter a description"
-                            />
-                        </div>
+                ) : (
+                    <div className="col-12 mt-4">
                         <Button
-                            label="Save Changes"
-                            onClick={saveBookmarkChanges}
+                            label="Add New Category"
+                            icon="pi pi-plus"
+                            onClick={() => setAddingCategory(true)}
                         />
                     </div>
-                </Dialog>
-            </div>
+                )}
+            </DragDropContext>
+
+            {/* Add Link Dialog */}
+            <Dialog
+                header="Add Link"
+                visible={addDialogVisible}
+                style={{ width: "400px" }}
+                modal
+                onHide={() => {
+                    setAddDialogVisible(false);
+                    setLinkData({ url: "", description: "", faviconUrl: "" });
+                    setCurrentCategoryId(null);
+                }}
+            >
+                <div className="p-fluid">
+                    <div className="field">
+                        <label htmlFor="url">URL</label>
+                        <InputText
+                            id="url"
+                            value={linkData.url}
+                            onChange={(e) =>
+                                setLinkData({
+                                    ...linkData,
+                                    url: e.target.value,
+                                })
+                            }
+                            placeholder="Enter the URL"
+                        />
+                    </div>
+                    <div className="field">
+                        <label htmlFor="description">Description</label>
+                        <InputTextarea
+                            id="description"
+                            value={linkData.description}
+                            onChange={(e) =>
+                                setLinkData({
+                                    ...linkData,
+                                    description: e.target.value,
+                                })
+                            }
+                            rows={3}
+                            placeholder="Enter a description"
+                        />
+                    </div>
+                    <Button label="Add Link" onClick={addLink} />
+                </div>
+            </Dialog>
+
+            {/* Edit Link Dialog */}
+            <Dialog
+                header="Edit Link"
+                visible={editDialogVisible}
+                style={{ width: "400px" }}
+                modal
+                onHide={() => {
+                    setEditDialogVisible(false);
+                    setLinkData({ url: "", description: "", faviconUrl: "" });
+                    setCurrentLink(null);
+                    setCurrentCategoryId(null);
+                }}
+            >
+                <div className="p-fluid">
+                    <div className="field">
+                        <label htmlFor="url">URL</label>
+                        <InputText
+                            id="url"
+                            value={linkData.url}
+                            onChange={(e) =>
+                                setLinkData({
+                                    ...linkData,
+                                    url: e.target.value,
+                                })
+                            }
+                            placeholder="Enter the URL"
+                        />
+                    </div>
+                    <div className="field">
+                        <label htmlFor="description">Description</label>
+                        <InputTextarea
+                            id="description"
+                            value={linkData.description}
+                            onChange={(e) =>
+                                setLinkData({
+                                    ...linkData,
+                                    description: e.target.value,
+                                })
+                            }
+                            rows={3}
+                            placeholder="Enter a description"
+                        />
+                    </div>
+                    <Button label="Save Changes" onClick={saveLinkChanges} />
+                </div>
+            </Dialog>
         </Layout>
     );
 };

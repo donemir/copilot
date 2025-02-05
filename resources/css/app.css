@@ -5,3 +5,15 @@
 .bookmarks-list li {
     list-style-type: none;
 }
+
+.p-menu
+    .p-menuitem:not(.p-highlight):not(.p-disabled).p-focus
+    > .p-menuitem-content,
+.p-menu
+    .p-menuitem:not(.p-highlight):not(.p-disabled):hover
+    > .p-menuitem-content {
+    background: var(
+        --surface-100
+    ) !important; /* PrimeReact's adaptable color */
+    color: var(--text-color) !important;
+}
