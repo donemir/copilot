@@ -71,6 +71,7 @@ Route::middleware('auth')->group(function () {
 
     // Bookmarks
     Route::post('/bookmarks', [BookmarksController::class, 'store'])->name('bookmarks.store');
+    Route::post('/bookmarks/update-order', [BookmarksController::class, 'updateOrder'])->name('bookmarks.updateOrder');
     Route::put('/bookmarks/{bookmark}', [BookmarksController::class, 'update'])->name('bookmarks.update');
     Route::delete('/bookmarks/{bookmark}', [BookmarksController::class, 'destroy'])->name('bookmarks.destroy');
 });

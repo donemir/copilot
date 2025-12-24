@@ -19,6 +19,7 @@ class Bookmark extends Model
         'description',
         'favicon_url',
         'pinned',
+        'order',
     ];
 
     protected $casts = [

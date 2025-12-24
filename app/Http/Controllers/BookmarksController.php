@@ -43,12 +43,15 @@ class BookmarksController extends Controller
             ->where('user_id', auth()->id())
             ->firstOrFail();
     
+        $maxOrder = $category->bookmarks()->max('order') ?? -1;
+
         $category->bookmarks()->create([
             'user_id' => auth()->id(),
             'url' => $request->url,
             'description' => $request->description,
             'favicon_url' => $request->favicon_url,
             'pinned' => false,
+            'order' => $maxOrder + 1,
         ]);
     
         return redirect()->back()->with('success', 'Link added successfully.')->withStatus(303);
@@ -110,5 +113,35 @@ class BookmarksController extends Controller
         $bookmark->delete();
 
         return redirect()->back()->with('success', 'Link deleted successfully.')->withStatus(303);
+    }
+
+    public function updateOrder(Request $request)
+    {
+        $data = $request->validate([
+            'bookmarks' => 'required|array',
+            'bookmarks.*.id' => 'required|exists:bookmarks,id',
+            'bookmarks.*.order' => 'required|integer',
+        ]);
+
+        $user = auth()->user();
+
+        // Get all bookmark IDs from request
+        $bookmarkIds = array_column($data['bookmarks'], 'id');
+        
+        // Verify all bookmarks belong to the authenticated user
+        $userBookmarkIds = $user->bookmarks()->pluck('id')->toArray();
+        
+        foreach ($bookmarkIds as $bookmarkId) {
+            if (!in_array($bookmarkId, $userBookmarkIds)) {
+                return response()->json(['error' => 'Invalid bookmark id'], 403);
+            }
+        }
+
+        // Update bookmark order
+        foreach ($data['bookmarks'] as $bookmarkData) {
+            Bookmark::where('id', $bookmarkData['id'])->update(['order' => $bookmarkData['order']]);
+        }
+
+        return redirect()->back();
     }
 }

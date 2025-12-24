@@ -235,6 +235,7 @@ const Dashboard = () => {
                 url: linkData.url,
                 description: linkData.description,
                 favicon_url: faviconUrl,
+                order: categories.find(c => c.id === currentCategoryId)?.bookmarks.length || 0,
             },
             {
                 onSuccess: () => {
@@ -485,6 +486,51 @@ const Dashboard = () => {
             if (!sourceCategory || !destCategory) return;
 
             const movingItem = sourceCategory.bookmarks[source.index];
+            
+            // SAME CATEGORY - reorder only
+            if (sourceCategory.id === destCategory.id) {
+                const reorderedBookmarks = Array.from(sourceCategory.bookmarks);
+                reorderedBookmarks.splice(source.index, 1);
+                reorderedBookmarks.splice(destination.index, 0, movingItem);
+                
+                // Update order field
+                const updatedBookmarks = reorderedBookmarks.map((bookmark, idx) => ({
+                    ...bookmark,
+                    order: idx,
+                }));
+                
+                setCategories((prevCategories) =>
+                    prevCategories.map((category) =>
+                        category.id === sourceCategory.id
+                            ? { ...category, bookmarks: updatedBookmarks }
+                            : category
+                    )
+                );
+                
+                // Send to backend
+                router.post(
+                    route("bookmarks.updateOrder"),
+                    {
+                        bookmarks: updatedBookmarks.map((bookmark) => ({
+                            id: bookmark.id,
+                            order: bookmark.order,
+                        })),
+                    },
+                    {
+                        preserveState: true,
+                        preserveScroll: true,
+                        onSuccess: () => {
+                            console.log("Link order updated successfully");
+                        },
+                        onError: (errors) => {
+                            console.error("Error updating link order:", errors);
+                        },
+                    }
+                );
+                return;
+            }
+            
+            // DIFFERENT CATEGORY - move to new category
             const newSourceBookmarks = Array.from(sourceCategory.bookmarks);
             newSourceBookmarks.splice(source.index, 1);
 
@@ -819,8 +865,10 @@ const Dashboard = () => {
                                                                     </div>
                                                                 </div>
                                                             ) : (
-                                                                <ul className="list-none p-0 m-0">
-                                                                    {category.bookmarks.map(
+                                                            <ul className="list-none p-0 m-0">
+                                                                {category.bookmarks
+                                                                    .sort((a, b) => (a.order || 0) - (b.order || 0))
+                                                                    .map(
                                                                         (
                                                                             link,
                                                                             idx

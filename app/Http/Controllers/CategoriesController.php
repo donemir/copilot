@@ -14,7 +14,9 @@ class CategoriesController extends Controller
 
         // Fetch categories ordered by 'order'
         $categories = $user->categories()
-            ->with('bookmarks')
+            ->with(['bookmarks' => function ($query) {
+                $query->orderBy('order', 'asc');
+            }])
             ->orderBy('order', 'asc')
             ->get();
 
@@ -38,7 +40,9 @@ class CategoriesController extends Controller
             }
 
             $categories = $user->categories()
-                ->with('bookmarks')
+                ->with(['bookmarks' => function ($query) {
+                    $query->orderBy('order', 'asc');
+                }])
                 ->orderBy('order', 'asc')
                 ->get();
         }
