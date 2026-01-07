@@ -877,6 +877,35 @@ const Dashboard = () => {
             <Toast ref={toast} />
             <ConfirmDialog />
 
+            {/* Pinned Links Bar */}
+            {pinnedLinks.length > 0 && (
+                <div className="col-12 mb-3">
+                    <div className="card">
+                        <h5>Pinned Links</h5>
+                        <div className="flex flex-wrap gap-2">
+                            {pinnedLinks.map((link) => (
+                                <div
+                                    key={link.id}
+                                    className="surface-100 p-2 border-round cursor-pointer"
+                                    onClick={() => openLink(link.url)}
+                                >
+                                    <div className="flex align-items-center gap-2">
+                                        {link.favicon_url && (
+                                            <img
+                                                src={link.favicon_url}
+                                                alt="favicon"
+                                                style={{ width: "24px", height: "24px" }}
+                                            />
+                                        )}
+                                        <span>{link.description || link.url}</span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div className="grid">
                 <div className="col-12">
                     <div className="card">
