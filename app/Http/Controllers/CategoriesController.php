@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Category;
+use App\Models\Section;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -12,16 +13,27 @@ class CategoriesController extends Controller
     {
         $user = auth()->user();
 
-        // Fetch categories ordered by 'order'
-        $categories = $user->categories()
+        // Fetch sections with their categories
+        $sections = $user->sections()
+            ->with(['categories' => function ($query) {
+                $query->with(['bookmarks' => function ($q) {
+                    $q->orderBy('order', 'asc');
+                }])->orderBy('order', 'asc');
+            }])
+            ->orderBy('order', 'asc')
+            ->get();
+
+        // Fetch categories without section
+        $categoriesWithoutSection = $user->categories()
+            ->whereNull('section_id')
             ->with(['bookmarks' => function ($query) {
                 $query->orderBy('order', 'asc');
             }])
             ->orderBy('order', 'asc')
             ->get();
 
-        // If the user has no categories, insert default ones and assign orders
-        if ($categories->isEmpty()) {
+        // Initialize default categories if none exist
+        if ($sections->isEmpty() && $categoriesWithoutSection->isEmpty()) {
             $defaultCategories = [
                 ['name' => 'Web Management'],
                 ['name' => 'Productivity'],
@@ -29,17 +41,17 @@ class CategoriesController extends Controller
                 ['name' => 'Google Properties'],
                 ['name' => 'Financial / Business'],
                 ['name' => 'Education & Learning'],
-                // ... other default categories
             ];
 
             foreach ($defaultCategories as $index => $categoryData) {
                 $user->categories()->create([
                     'name' => $categoryData['name'],
-                    'order' => $index // start from 0 or 1, your choice
+                    'order' => $index
                 ]);
             }
 
-            $categories = $user->categories()
+            $categoriesWithoutSection = $user->categories()
+                ->whereNull('section_id')
                 ->with(['bookmarks' => function ($query) {
                     $query->orderBy('order', 'asc');
                 }])
@@ -48,7 +60,8 @@ class CategoriesController extends Controller
         }
 
         return Inertia::render('Dashboard/Organizer', [
-            'categories' => $categories,
+            'sections' => $sections,
+            'categoriesWithoutSection' => $categoriesWithoutSection,
         ]);
     }
 
@@ -130,4 +143,124 @@ class CategoriesController extends Controller
         return redirect()->back()->with('success', 'Category deleted successfully.');
     }
 
+    public function storeSection(Request $request)
+    {
+        $request->validate([
+            'name' => 'required|string|max:255',
+        ]);
+
+        $user = auth()->user();
+        $maxOrder = $user->sections()->max('order') ?? -1;
+
+        $user->sections()->create([
+            'name' => $request->name,
+            'order' => $maxOrder + 1,
+        ]);
+
+        return redirect()->back();
+    }
+
+    public function updateSection(Request $request, $sectionId)
+    {
+        $section = Section::where('id', $sectionId)
+            ->where('user_id', auth()->id())
+            ->firstOrFail();
+
+        $request->validate([
+            'name' => 'required|string|max:255',
+        ]);
+
+        $section->update(['name' => $request->name]);
+
+        return redirect()->back();
+    }
+
+    public function destroySection($sectionId)
+    {
+        $section = Section::where('id', $sectionId)
+            ->where('user_id', auth()->id())
+            ->firstOrFail();
+
+        // Move categories out of section before deleting
+        $section->categories()->update(['section_id' => null]);
+        
+        $section->delete();
+
+        return redirect()->back();
+    }
+
+    public function reorderSections(Request $request)
+    {
+        $data = $request->validate([
+            'sections' => 'required|array',
+            'sections.*.id' => 'required|exists:sections,id',
+            'sections.*.order' => 'required|integer',
+        ]);
+
+        foreach ($data['sections'] as $sectionData) {
+            Section::where('id', $sectionData['id'])
+                ->where('user_id', auth()->id())
+                ->update(['order' => $sectionData['order']]);
+        }
+
+        return response()->json(['success' => true]);
+    }
+
+    public function moveCategoryToSection(Request $request, $categoryId)
+    {
+        $category = Category::where('id', $categoryId)
+            ->where('user_id', auth()->id())
+            ->firstOrFail();
+
+        $validated = $request->validate([
+            'section_id' => 'nullable|exists:sections,id',
+        ]);
+
+        // If moving to a section, verify it belongs to the user
+        if ($validated['section_id']) {
+            Section::where('id', $validated['section_id'])
+                ->where('user_id', auth()->id())
+                ->firstOrFail();
+        }
+
+        \Log::info('Moving category', [
+            'category_id' => $categoryId,
+            'old_section_id' => $category->section_id,
+            'new_section_id' => $validated['section_id']
+        ]);
+
+        // Update the category's section
+        $category->section_id = $validated['section_id'];
+        $category->save();
+
+        // Get the max order in destination and set this category's order
+        if ($validated['section_id']) {
+            $maxOrder = Category::where('section_id', $validated['section_id'])
+                ->where('user_id', auth()->id())
+                ->where('id', '!=', $categoryId)
+                ->max('order') ?? -1;
+            
+            $category->order = $maxOrder + 1;
+            $category->save();
+        } else {
+            $maxOrder = Category::whereNull('section_id')
+                ->where('user_id', auth()->id())
+                ->where('id', '!=', $categoryId)
+                ->max('order') ?? -1;
+            
+            $category->order = $maxOrder + 1;
+            $category->save();
+        }
+
+        // Refresh the model to get the latest data from DB
+        $category->refresh();
+
+        \Log::info('Category moved successfully', [
+            'category_id' => $categoryId,
+            'new_section_id' => $category->section_id,
+            'new_order' => $category->order
+        ]);
+
+        return redirect()->back();
+    }
 }

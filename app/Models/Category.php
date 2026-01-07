@@ -12,7 +12,7 @@ class Category extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['name', 'user_id', 'order'];
+    protected $fillable = ['user_id', 'name', 'order', 'section_id'];
 
     public function user(): BelongsTo
     {
@@ -22,5 +22,9 @@ class Category extends Model
     public function bookmarks(): HasMany
     {
         return $this->hasMany(Bookmark::class);
+    }
+    public function section()
+    {
+        return $this->belongsTo(Section::class);
     }
 }

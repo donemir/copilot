@@ -60,4 +60,8 @@ class User extends Authenticatable
     {
         return $this->hasOne(UserSetting::class);
     }
+    public function sections()
+    {
+        return $this->hasMany(Section::class);
+    }
 }

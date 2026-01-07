@@ -74,6 +74,13 @@ Route::middleware('auth')->group(function () {
     Route::post('/bookmarks/update-order', [BookmarksController::class, 'updateOrder'])->name('bookmarks.updateOrder');
     Route::put('/bookmarks/{bookmark}', [BookmarksController::class, 'update'])->name('bookmarks.update');
     Route::delete('/bookmarks/{bookmark}', [BookmarksController::class, 'destroy'])->name('bookmarks.destroy');
+
+    // Sections
+    Route::post('/sections', [CategoriesController::class, 'storeSection'])->name('sections.store');
+    Route::put('/sections/{section}', [CategoriesController::class, 'updateSection'])->name('sections.update');
+    Route::delete('/sections/{section}', [CategoriesController::class, 'destroySection'])->name('sections.destroy');
+    Route::put('/sections/reorder', [CategoriesController::class, 'reorderSections'])->name('sections.reorder');
+    Route::put('/categories/{category}/move-to-section', [CategoriesController::class, 'moveCategoryToSection'])->name('categories.moveToSection');
 });
 
 
