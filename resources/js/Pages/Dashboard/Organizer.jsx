@@ -496,21 +496,8 @@ const Dashboard = () => {
                     }));
                     
                     router.put("/categories/reorder", { categories: reorderData });
-                    } else {
-                        // Move category to different section
-                        router.put(`/categories/${sourceInfo.categoryId}/move-to-section`, { section_id: destSectionId }, {
-                            onSuccess: () => {
-                                router.reload({ only: ["sections", "categoriesWithoutSection"] });
-                            },
-                            onError: (errors) => {
-                                console.error("Error moving category:", errors);
-                            }
-                        });
-                    }
-            } else if (source.droppableId === "categories-without-section" && destIsSection) {
-                // Move from no section to a section
-                const destSectionId = parseInt(destination.droppableId.replace("section-", ""));
-
+                } else {
+                    // Move category to different section
                     router.put(`/categories/${sourceInfo.categoryId}/move-to-section`, { section_id: destSectionId }, {
                         onSuccess: () => {
                             router.reload({ only: ["sections", "categoriesWithoutSection"] });
@@ -519,12 +506,28 @@ const Dashboard = () => {
                             console.error("Error moving category:", errors);
                         }
                     });
+                }
+            } else if (source.droppableId === "categories-without-section" && destIsSection) {
+                // Move from no section to a section
+                const destSectionId = parseInt(destination.droppableId.replace("section-", ""));
+
+                router.put(`/categories/${sourceInfo.categoryId}/move-to-section`, { section_id: destSectionId }, {
+                    onSuccess: () => {
+                        router.reload({ only: ["sections", "categoriesWithoutSection"] });
+                    },
+                    onError: (errors) => {
+                        console.error("Error moving category:", errors);
+                    }
+                });
             } else if (sourceIsSection && destination.droppableId === "categories-without-section") {
                 // Move from section to no section
                 router.put(`/categories/${sourceInfo.categoryId}/move-to-section`, { section_id: null }, {
                     onSuccess: () => {
                         router.reload({ only: ["sections", "categoriesWithoutSection"] });
                     },
+                    onError: (errors) => {
+                        console.error("Error moving category:", errors);
+                    }
                 });
             } else if (source.droppableId === "categories-without-section" && destination.droppableId === "categories-without-section") {
                 // Reorder within categories-without-section
@@ -581,6 +584,200 @@ const Dashboard = () => {
                 });
             }
         }
+    };
+
+    // Helper to render categories in a 3-column grid with placeholders
+    const renderCategoryGrid = (categories, droppableId) => {
+        const COLUMNS = 3;
+        const totalSlots = Math.ceil((categories.length + 1) / COLUMNS) * COLUMNS;
+        const items = [...categories];
+        
+        // Fill remaining slots with nulls for placeholders
+        while (items.length < totalSlots) {
+            items.push(null);
+        }
+
+        return items.map((category, idx) => {
+            if (category === null) {
+                // Placeholder slot
+                return (
+                    <div key={`placeholder-${idx}`} className="col-12 md:col-6 lg:col-4">
+                        <div 
+                            className="card surface-100"
+                            style={{
+                                minHeight: "200px",
+                                border: "2px dashed var(--surface-border)",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center"
+                            }}
+                        >
+                            <span>Category</span>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <Draggable
+                    key={category.id}
+                    draggableId={droppableId === "categories-without-section" 
+                        ? `nosection-category-${category.id}` 
+                        : `section-${droppableId}-category-${category.id}`}
+                    index={idx}
+                    type="category"
+                >
+                    {(provided, snapshot) => (
+                        <div
+                            className="col-12 md:col-6 lg:col-4"
+                            ref={provided.innerRef}
+                            {...provided.draggableProps}
+                            style={{
+                                ...provided.draggableProps.style,
+                            }}
+                        >
+                            <div
+                                className={`card ${snapshot.isDragging ? "surface-200" : ""}`}
+                                style={{
+                                    minHeight: "200px"
+                                }}
+                            >
+                                {/* Category Header */}
+                                <div className="flex justify-content-between align-items-center mb-3">
+                                    <div className="flex align-items-center gap-2">
+                                        <div 
+                                            {...provided.dragHandleProps} 
+                                            className="surface-100 cursor-move p-2"
+                                            style={{
+                                                borderRadius: '4px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                width: '32px',
+                                                height: '32px'
+                                            }}
+                                        >
+                                            <i className="pi pi-bars" style={{ fontSize: '1.2rem' }} />
+                                        </div>
+                                        
+                                        {editingCategoryId === category.id ? (
+                                            <InputText
+                                                value={editingCategoryName}
+                                                onChange={(e) => setEditingCategoryName(e.target.value)}
+                                                onBlur={() => saveCategoryName(category.id)}
+                                                onKeyDown={(e) => e.key === "Enter" && saveCategoryName(category.id)}
+                                                autoFocus
+                                            />
+                                        ) : (
+                                            <h6
+                                                className="m-0 cursor-pointer"
+                                                onDoubleClick={() => startEditingCategory(category)}
+                                            >
+                                                {category.name}
+                                            </h6>
+                                        )}
+                                    </div>
+                                    
+                                    <div className="flex gap-1">
+                                        <Button
+                                            icon="pi pi-plus"
+                                            className="p-button-rounded p-button-text"
+                                            onClick={() => openAddDialog(category.id)}
+                                            tooltip="Add Link"
+                                            tooltipOptions={{ position: "top" }}
+                                        />
+                                        <CategoryOptions category={category} />
+                                    </div>
+                                </div>
+
+                                {/* Links within category */}
+                                <Droppable
+                                    droppableId={category.id.toString()}
+                                    type="bookmark"
+                                >
+                                    {(provided, snapshot) => (
+                                        <div
+                                            ref={provided.innerRef}
+                                            {...provided.droppableProps}
+                                            className={`p-2 rounded ${
+                                                snapshot.isDraggingOver
+                                                    ? "border-2 border-dashed border-blue-500"
+                                                    : "border-2 border-dashed border-transparent"
+                                            }`}
+                                            style={{ minHeight: "80px" }}
+                                        >
+                                            {category.bookmarks.length === 0 ? (
+                                                <div>
+                                                    <p className="text-sm text-gray-400">No links yet. Add one!</p>
+                                                </div>
+                                            ) : (
+                                                <div style={{ listStyle: "none", padding: 0 }}>
+                                                    {category.bookmarks.map((link, idx) => (
+                                                        <Draggable
+                                                            key={link.id}
+                                                            draggableId={link.id.toString()}
+                                                            index={idx}
+                                                            type="bookmark"
+                                                        >
+                                                            {(provided, snapshot) => (
+                                                                <div
+                                                                    ref={provided.innerRef}
+                                                                    {...provided.draggableProps}
+                                                                    onClick={() => openLink(link.url)}
+                                                                    className={snapshot.isDragging ? "surface-200" : "surface-100"}
+                                                                    style={{
+                                                                        ...provided.draggableProps.style,
+                                                                        borderRadius: "8px",
+                                                                        border: "1px solid var(--surface-border)",
+                                                                        marginBottom: "0.5rem",
+                                                                        padding: "0.5rem",
+                                                                        listStyle: "none"
+                                                                    }}
+                                                                >
+                                                                    <div className="flex justify-content-between align-items-center cursor-pointer">
+                                                                        <div
+                                                                            className="flex items-center"
+                                                                            {...provided.dragHandleProps}
+                                                                            onClick={(e) => e.stopPropagation()}
+                                                                        >
+                                                                            <i className="pi pi-arrows mr-2 cursor-move" />
+                                                                            {link.favicon_url && (
+                                                                                <img
+                                                                                    src={link.favicon_url}
+                                                                                    alt="favicon"
+                                                                                    onError={(e) => {
+                                                                                        e.target.onerror = null;
+                                                                                        e.target.style.display = "none";
+                                                                                    }}
+                                                                                    style={{
+                                                                                        width: "24px",
+                                                                                        height: "24px",
+                                                                                        marginRight: "8px",
+                                                                                    }}
+                                                                                />
+                                                                            )}
+                                                                        </div>
+                                                                        <span style={{ flex: 1 }}>{link.description || link.url}</span>
+                                                                        <div onClick={(e) => e.stopPropagation()}>
+                                                                            <LinkOptions link={link} categoryId={category.id} />
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </Draggable>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            {provided.placeholder}
+                                        </div>
+                                    )}
+                                </Droppable>
+                            </div>
+                        </div>
+                    )}
+                </Draggable>
+            );
+        });
     };
 
     // 3-dots menu for links
@@ -707,23 +904,21 @@ const Dashboard = () => {
                                                         }}
                                                     >
                                                         {/* Section Header */}
-<div className="flex align-items-center mb-3">
-    <div 
-        {...provided.dragHandleProps} 
-        className="cursor-move p-2 mr-2"
-        style={{
-            background: '#e0e0e0',
-            borderRadius: '4px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: '36px',
-            height: '36px'
-        }}
-    >
-        <i className="pi pi-bars" style={{ fontSize: '1.3rem' }} />
-    </div>
-    
+                                                        <div className="flex align-items-center mb-3">
+                                                            <div 
+                                                                {...provided.dragHandleProps} 
+                                                                className="surface-200 cursor-move p-2 mr-2"
+                                                                style={{
+                                                                    borderRadius: '4px',
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    justifyContent: 'center',
+                                                                    width: '36px',
+                                                                    height: '36px'
+                                                                }}
+                                                            >
+                                                                <i className="pi pi-bars" style={{ fontSize: '1.3rem' }} />
+                                                            </div>
                                                             
                                                             {editingSectionId === section.id ? (
                                                                 <InputText
@@ -754,6 +949,7 @@ const Dashboard = () => {
                                                         <Droppable
                                                             droppableId={`section-${section.id}`}
                                                             type="category"
+                                                            direction="horizontal"
                                                         >
                                                             {(provided, snapshot) => (
                                                                 <div
@@ -762,167 +958,11 @@ const Dashboard = () => {
                                                                     className={`grid ${
                                                                         snapshot.isDraggingOver
                                                                             ? "border-2 border-dashed border-blue-500 p-3"
-                                                                            : ""
+                                                                            : "p-2"
                                                                     }`}
-                                                                    style={{ minHeight: "100px" }}
+                                                                    style={{ minHeight: "250px" }}
                                                                 >
-                                                                    {section.categories && section.categories.map((category, catIdx) => (
-                                                                        <Draggable
-                                                                            key={category.id}
-                                                                            draggableId={`section-${section.id}-category-${category.id}`}
-                                                                            index={catIdx}
-                                                                            type="category"
-                                                                        >
-                                                                            {(provided, snapshot) => (
-                                                                                <div
-                                                                                    className="col-12 md:col-6 lg:col-4"
-                                                                                    ref={provided.innerRef}
-                                                                                    {...provided.draggableProps}
-                                                                                    style={{
-                                                                                        ...provided.draggableProps.style,
-                                                                                    }}
-                                                                                >
-                                                                                    <div
-                                                                                        className="card"
-                                                                                        style={{
-                                                                                            background: snapshot.isDragging ? "#f0f0f0" : "white",
-                                                                                        }}
-                                                                                    >
-                                                                                        {/* Category Header */}
-{/* Category Header */}
-<div className="flex justify-content-between align-items-center mb-3">
-    <div className="flex align-items-center gap-2">
-        <div 
-            {...provided.dragHandleProps} 
-            className="cursor-move p-2"
-            style={{
-                background: '#f0f0f0',
-                borderRadius: '4px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: '32px',
-                height: '32px'
-            }}
-        >
-            <i className="pi pi-bars" style={{ fontSize: '1.2rem' }} />
-        </div>
-                                                                                                
-                                                                                                {editingCategoryId === category.id ? (
-                                                                                                    <InputText
-                                                                                                        value={editingCategoryName}
-                                                                                                        onChange={(e) => setEditingCategoryName(e.target.value)}
-                                                                                                        onBlur={() => saveCategoryName(category.id)}
-                                                                                                        onKeyDown={(e) => e.key === "Enter" && saveCategoryName(category.id)}
-                                                                                                        autoFocus
-                                                                                                    />
-                                                                                                ) : (
-                                                                                                    <h6
-                                                                                                        className="m-0 cursor-pointer"
-                                                                                                        onDoubleClick={() => startEditingCategory(category)}
-                                                                                                    >
-                                                                                                        {category.name}
-                                                                                                    </h6>
-                                                                                                )}
-                                                                                            </div>
-                                                                                            
-                                                                                            <div className="flex gap-1">
-                                                                                                <Button
-                                                                                                    icon="pi pi-plus"
-                                                                                                    className="p-button-rounded p-button-text"
-                                                                                                    onClick={() => openAddDialog(category.id)}
-                                                                                                    tooltip="Add Link"
-                                                                                                    tooltipOptions={{ position: "top" }}
-                                                                                                />
-                                                                                                <CategoryOptions category={category} />
-                                                                                            </div>
-                                                                                        </div>
-
-                                                                                        {/* Links within category */}
-                                                                                        <Droppable
-                                                                                            droppableId={category.id.toString()}
-                                                                                            type="bookmark"
-                                                                                        >
-                                                                                            {(provided, snapshot) => (
-                                                                                                <div
-                                                                                                    ref={provided.innerRef}
-                                                                                                    {...provided.droppableProps}
-                                                                                                    className={`min-h-20 p-2 rounded ${
-                                                                                                        snapshot.isDraggingOver
-                                                                                                            ? "border-2 border-dashed border-blue-500"
-                                                                                                            : "border-2 border-dashed border-transparent"
-                                                                                                    }`}
-                                                                                                >
-                                                                                                    {category.bookmarks.length === 0 ? (
-                                                                                                        <div>
-                                                                                                            <p>No links yet. Add one!</p>
-                                                                                                        </div>
-                                                                                                    ) : (
-                                                                                                        <ul style={{ listStyle: "none", padding: 0 }}>
-                                                                                                            {category.bookmarks.map((link, idx) => (
-                                                                                                                <Draggable
-                                                                                                                    key={link.id}
-                                                                                                                    draggableId={link.id.toString()}
-                                                                                                                    index={idx}
-                                                                                                                    type="bookmark"
-                                                                                                                >
-                                                                                                                    {(provided, snapshot) => (
-                                                                                                                        <li
-                                                                                                                            ref={provided.innerRef}
-                                                                                                                            {...provided.draggableProps}
-                                                                                                                            onClick={() => openLink(link.url)}
-                                                                                                                            style={{
-                                                                                                                                ...provided.draggableProps.style,
-                                                                                                                                borderRadius: "8px",
-                                                                                                                                background: snapshot.isDragging ? "#fddbdc" : "#8383830d",
-                                                                                                                                border: "1px solid #80808042",
-                                                                                                                                marginBottom: "0.5rem",
-                                                                                                                                padding: "0.5rem",
-                                                                                                                            }}
-                                                                                                                        >
-                                                                                                                            <div className="flex justify-content-between align-items-center cursor-pointer">
-                                                                                                                                <div
-                                                                                                                                    className="flex items-center"
-                                                                                                                                    {...provided.dragHandleProps}
-                                                                                                                                    onClick={(e) => e.stopPropagation()}
-                                                                                                                                >
-                                                                                                                                    <i className="pi pi-arrows mr-2 cursor-move" />
-                                                                                                                                    {link.favicon_url && (
-                                                                                                                                        <img
-                                                                                                                                            src={link.favicon_url}
-                                                                                                                                            alt="favicon"
-                                                                                                                                            onError={(e) => {
-                                                                                                                                                e.target.onerror = null;
-                                                                                                                                                e.target.style.display = "none";
-                                                                                                                                            }}
-                                                                                                                                            style={{
-                                                                                                                                                width: "24px",
-                                                                                                                                                height: "24px",
-                                                                                                                                                marginRight: "8px",
-                                                                                                                                            }}
-                                                                                                                                        />
-                                                                                                                                    )}
-                                                                                                                                </div>
-                                                                                                                                <span>{link.description || link.url}</span>
-                                                                                                                                <div onClick={(e) => e.stopPropagation()}>
-                                                                                                                                    <LinkOptions link={link} categoryId={category.id} />
-                                                                                                                                </div>
-                                                                                                                            </div>
-                                                                                                                        </li>
-                                                                                                                    )}
-                                                                                                                </Draggable>
-                                                                                                            ))}
-                                                                                                        </ul>
-                                                                                                    )}
-                                                                                                    {provided.placeholder}
-                                                                                                </div>
-                                                                                            )}
-                                                                                        </Droppable>
-                                                                                    </div>
-                                                                                </div>
-                                                                            )}
-                                                                        </Draggable>
-                                                                    ))}
+                                                                    {renderCategoryGrid(section.categories || [], section.id)}
                                                                     {provided.placeholder}
                                                                 </div>
                                                             )}
@@ -961,7 +1001,11 @@ const Dashboard = () => {
                             {/* Categories Without Section */}
                             <div className="mt-4">
                                 <h5>Uncategorized Sections</h5>
-                                <Droppable droppableId="categories-without-section" type="category">
+                                <Droppable 
+                                    droppableId="categories-without-section" 
+                                    type="category"
+                                    direction="horizontal"
+                                >
                                     {(provided, snapshot) => (
                                         <div
                                             ref={provided.innerRef}
@@ -969,166 +1013,11 @@ const Dashboard = () => {
                                             className={`grid ${
                                                 snapshot.isDraggingOver
                                                     ? "border-2 border-dashed border-blue-500 p-3"
-                                                    : ""
+                                                    : "p-2"
                                             }`}
-                                            style={{ minHeight: "100px" }}
+                                            style={{ minHeight: "250px" }}
                                         >
-                                            {categoriesWithoutSection.map((category, idx) => (
-                                                <Draggable
-                                                    key={category.id}
-                                                    draggableId={`nosection-category-${category.id}`}
-                                                    index={idx}
-                                                    type="category"
-                                                >
-                                                    {(provided, snapshot) => (
-                                                        <div
-                                                            className="col-12 md:col-6 lg:col-4"
-                                                            ref={provided.innerRef}
-                                                            {...provided.draggableProps}
-                                                            style={{
-                                                                ...provided.draggableProps.style,
-                                                            }}
-                                                        >
-                                                            <div
-                                                                className="card"
-                                                                style={{
-                                                                    background: snapshot.isDragging ? "#f0f0f0" : "white",
-                                                                }}
-                                                            >
-                                                                {/* Same category content as in sections */}
-{/* Same category content as in sections */}
-<div className="flex justify-content-between align-items-center mb-3">
-    <div className="flex align-items-center gap-2">
-        <div 
-            {...provided.dragHandleProps} 
-            className="cursor-move p-2"
-            style={{
-                background: '#f0f0f0',
-                borderRadius: '4px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: '32px',
-                height: '32px'
-            }}
-        >
-            <i className="pi pi-bars" style={{ fontSize: '1.2rem' }} />
-        </div>
-                                                                        
-                                                                        {editingCategoryId === category.id ? (
-                                                                            <InputText
-                                                                                value={editingCategoryName}
-                                                                                onChange={(e) => setEditingCategoryName(e.target.value)}
-                                                                                onBlur={() => saveCategoryName(category.id)}
-                                                                                onKeyDown={(e) => e.key === "Enter" && saveCategoryName(category.id)}
-                                                                                autoFocus
-                                                                            />
-                                                                        ) : (
-                                                                            <h6
-                                                                                className="m-0 cursor-pointer"
-                                                                                onDoubleClick={() => startEditingCategory(category)}
-                                                                            >
-                                                                                {category.name}
-                                                                            </h6>
-                                                                        )}
-                                                                    </div>
-                                                                    
-                                                                    <div className="flex gap-1">
-                                                                        <Button
-                                                                            icon="pi pi-plus"
-                                                                            className="p-button-rounded p-button-text"
-                                                                            onClick={() => openAddDialog(category.id)}
-                                                                            tooltip="Add Link"
-                                                                            tooltipOptions={{ position: "top" }}
-                                                                        />
-                                                                        <CategoryOptions category={category} />
-                                                                    </div>
-                                                                </div>
-
-                                                                <Droppable
-                                                                    droppableId={category.id.toString()}
-                                                                    type="bookmark"
-                                                                >
-                                                                    {(provided, snapshot) => (
-                                                                        <div
-                                                                            ref={provided.innerRef}
-                                                                            {...provided.droppableProps}
-                                                                            className={`min-h-20 p-2 rounded ${
-                                                                                snapshot.isDraggingOver
-                                                                                    ? "border-2 border-dashed border-blue-500"
-                                                                                    : "border-2 border-dashed border-transparent"
-                                                                            }`}
-                                                                        >
-                                                                            {category.bookmarks.length === 0 ? (
-                                                                                <div>
-                                                                                    <p>No links yet. Add one!</p>
-                                                                                </div>
-                                                                            ) : (
-                                                                                <ul style={{ listStyle: "none", padding: 0 }}>
-                                                                                    {category.bookmarks.map((link, idx) => (
-                                                                                        <Draggable
-                                                                                            key={link.id}
-                                                                                            draggableId={link.id.toString()}
-                                                                                            index={idx}
-                                                                                            type="bookmark"
-                                                                                        >
-                                                                                            {(provided, snapshot) => (
-                                                                                                <li
-                                                                                                    ref={provided.innerRef}
-                                                                                                    {...provided.draggableProps}
-                                                                                                    onClick={() => openLink(link.url)}
-                                                                                                    style={{
-                                                                                                        ...provided.draggableProps.style,
-                                                                                                        borderRadius: "8px",
-                                                                                                        background: snapshot.isDragging ? "#fddbdc" : "#8383830d",
-                                                                                                        border: "1px solid #80808042",
-                                                                                                        marginBottom: "0.5rem",
-                                                                                                        padding: "0.5rem",
-                                                                                                    }}
-                                                                                                >
-                                                                                                    <div className="flex justify-content-between align-items-center cursor-pointer">
-                                                                                                        <div
-                                                                                                            className="flex items-center"
-                                                                                                            {...provided.dragHandleProps}
-                                                                                                            onClick={(e) => e.stopPropagation()}
-                                                                                                        >
-                                                                                                            <i className="pi pi-arrows mr-2 cursor-move" />
-                                                                                                            {link.favicon_url && (
-                                                                                                                <img
-                                                                                                                    src={link.favicon_url}
-                                                                                                                    alt="favicon"
-                                                                                                                    onError={(e) => {
-                                                                                                                        e.target.onerror = null;
-                                                                                                                        e.target.style.display = "none";
-                                                                                                                    }}
-                                                                                                                    style={{
-                                                                                                                        width: "24px",
-                                                                                                                        height: "24px",
-                                                                                                                        marginRight: "8px",
-                                                                                                                    }}
-                                                                                                                />
-                                                                                                            )}
-                                                                                                        </div>
-                                                                                                        <span>{link.description || link.url}</span>
-                                                                                                        <div onClick={(e) => e.stopPropagation()}>
-                                                                                                            <LinkOptions link={link} categoryId={category.id} />
-                                                                                                        </div>
-                                                                                                    </div>
-                                                                                                </li>
-                                                                                            )}
-                                                                                        </Draggable>
-                                                                                    ))}
-                                                                                </ul>
-                                                                            )}
-                                                                            {provided.placeholder}
-                                                                        </div>
-                                                                    )}
-                                                                </Droppable>
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </Draggable>
-                                            ))}
+                                            {renderCategoryGrid(categoriesWithoutSection, "categories-without-section")}
                                             {provided.placeholder}
                                         </div>
                                     )}
