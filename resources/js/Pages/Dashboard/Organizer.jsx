@@ -9,6 +9,7 @@ import { ConfirmDialog, confirmDialog } from "primereact/confirmdialog";
 import { Toast } from "primereact/toast";
 import { Menu } from "primereact/menu";
 import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
+import { Head } from '@inertiajs/react';
 
 import Layout from "@/Layouts/layout/layout.jsx";
 
@@ -874,6 +875,7 @@ const Dashboard = () => {
 
     return (
         <Layout>
+            <Head title="Organizer" />
             <Toast ref={toast} />
             <ConfirmDialog />
 

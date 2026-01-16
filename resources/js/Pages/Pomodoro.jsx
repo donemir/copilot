@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Button } from "primereact/button";
 import { Card } from "primereact/card";
 import { InputNumber } from "primereact/inputnumber";
+import { Head } from '@inertiajs/react';
 import Layout from "@/Layouts/layout/layout.jsx";
 
 const Pomodoro = () => {
@@ -222,6 +223,7 @@ const Pomodoro = () => {
 
     return (
         <Layout>
+            <Head title="Pomodoro" />
             <div className="p-4 max-w-lg mx-auto font-sans">
                 <audio
                     ref={tickAudio}

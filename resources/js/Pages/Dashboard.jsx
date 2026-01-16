@@ -5,6 +5,8 @@ import React, { useContext, useEffect, useRef, useState } from "react";
 import { LayoutContext } from "@/Layouts/layout/context/layoutcontext";
 import Layout from "@/Layouts/layout/layout.jsx";
 import DashboardInfoCard from "@/Components/DashboardInfoCard.jsx";
+import { Head } from '@inertiajs/react';
+
 
 const lineData = {
     labels: ["January", "February", "March", "April", "May", "June", "July"],
@@ -109,6 +111,7 @@ const Dashboard = () => {
 
     return (
         <Layout>
+            <Head title="Dashboard" />
             <div className="grid">
                 <DashboardInfoCard
                     title="Orders"

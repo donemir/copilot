@@ -4,6 +4,11 @@
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
 
+        <meta name="description" content="Organize and manage your tools and links efficiently">
+        <meta name="keywords" content="bookmarks, organizer, productivity, web management">
+    
+      <title inertia>{{ config('app.name', 'Copilot Organizer') }}</title>
+
         <title inertia>{{ config('app.name', 'LaraReact') }}</title>
 
         <!-- Fonts -->
